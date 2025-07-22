@@ -296,5 +296,54 @@ delete logic when related record is deleted
 Github deployment
 Ec2 deployment 
 
+---
+
+## Project Structure (Scaffold)
+
+```
+AWC-LMS/
+│
+├── src/
+│   ├── config/                # Configuration files (API keys, endpoints, etc.)
+│   │   └── index.js
+│   ├── models/                # Data models (Notification, Forum, Course, etc.)
+│   │   └── notification.model.js
+│   │   └── forum.model.js
+│   │   └── course.model.js
+│   ├── services/              # Business logic, CRUD, fetch, and subscription methods
+│   │   └── notification.service.js
+│   │   └── forum.service.js
+│   │   └── course.service.js
+│   ├── subscriptions/         # Subscription logic for real-time updates
+│   │   └── notification.sub.js
+│   │   └── forum.sub.js
+│   ├── utils/                 # Utility/helper functions
+│   │   └── index.js
+│   └── index.js               # Entry point for SDK integration and app logic
+│
+├── tests/                     # Unit and integration tests
+│   └── notification.test.js
+│   └── forum.test.js
+│
+├── public/                    # Static assets (if needed)
+│
+├── package.json               # Project dependencies and scripts
+├── .env                       # Environment variables (not committed)
+└── README.md                  # Project documentation
+```
+
+- **src/config/**: Centralized configuration (API keys, endpoints, etc.)
+- **src/models/**: Data models for Notifications, Forums, Courses, etc.
+- **src/services/**: Business logic, CRUD, fetch, and subscription methods for each model
+- **src/subscriptions/**: Real-time subscription logic
+- **src/utils/**: Utility/helper functions
+- **src/index.js**: Main entry point for SDK initialization and app logic
+- **tests/**: Test files for each module
+- **public/**: Static assets (optional)
+- **package.json**: Project dependencies and scripts
+- **.env**: Environment variables (not committed)
+
+---
+
 
 
