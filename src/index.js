@@ -39,9 +39,9 @@ async function fetchNotifications(plugin, { limit = 100, offset = 0 } = {}) {
   const alertsModel = plugin.switchTo('EduflowproAlert');
   const query = alertsModel.query()
     .limit(limit)
-    .offset(offset)
-    .orderBy([{ path: ['created_at'], type: 'desc' }]);
-  const payload = await query.fetch();
+    .offset(offset);
+  const payload = await query.fetch().toPromise();
+  console.log('Payloaddddddddddddddddddddddddddddddddddddddddddddddddddd', payload);
   const records = Object.values(payload.records || {});
   return records.map(mapSdkNotificationToUi);
 }
@@ -62,7 +62,16 @@ function renderNotifications(notifications) {
 (async function main() {
   try {
     const plugin = await initializeSdk();
-    window.plugin = plugin;
+    console.log('Plugin initializeddddddddddddddddddddddddddddddddddddddddddddddddddd', plugin.getState());
+    if (window.tempPlugin == undefined){
+      window.tempPlugin = plugin;
+      console.log('Plugin initialized');
+      // Log available model names for debugging
+      console.log('Available models:', Object.keys(plugin.getState()));
+    } 
+    else{
+      console.log('Plugin already initialized');
+    }
     const notifications = await fetchNotifications(plugin, { limit: 100 });
     renderNotifications(notifications);
   } catch (err) {
