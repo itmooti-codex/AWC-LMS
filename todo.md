@@ -81,3 +81,25 @@ example response
   },
   "extensions": {}
 }
+
+UI:
+Card is a link that can be clicked and opens origin url
+------------------------------------------------------------------
+| Title                                    Date Added (1 day ago)| 
+| Content                                                        |
+| Class ID                                                       |
+------------------------------------------------------------------ 
+
+
+Update to read
+mutation updateAlert(
+  $id: EduflowproAlertID
+  $payload: AlertUpdateInput = null
+) {
+  updateAlert(
+    query: [{ where: { id: $id } }]
+    payload: $payload
+  ) {
+    is_read
+  }
+}
