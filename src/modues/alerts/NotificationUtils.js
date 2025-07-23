@@ -4,7 +4,6 @@ export class NotificationUtils {
       Alert_Type: r.alert_type,
       Content: r.content,
       Date_Added: r.created_at,
-      Date_Modified: r.last_modified_at,
       ID: r.id,
       Is_Mentioned: r.is_mentioned,
       Is_Read: r.is_read,
@@ -17,7 +16,6 @@ export class NotificationUtils {
       Parent_Submission_ID: r.parent_submission_id,
       Title: r.title,
       Unique_ID: r.unique_id,
-      externalRawDataStatus: r.externalRawDataStatus,
     };
   }
 

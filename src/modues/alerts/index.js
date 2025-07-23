@@ -29,8 +29,6 @@ const { slug, apiKey } = config;
       window.bodyNotificationCore = bodyCore;
     }
 
-
-
     function handleCardClick(e) {
       const card = e.target.closest('.notification-card');
       if (!card) return;
@@ -77,8 +75,6 @@ const { slug, apiKey } = config;
     bodyEl?.addEventListener('click', handleCardClick);
     document.getElementById('navbar-mark-all')?.addEventListener('click', (e) => { e.stopPropagation(); markAllAsRead(); });
     document.getElementById('body-mark-all')?.addEventListener('click', markAllAsRead);
-
-
 
     // Expose utils
     window.NotificationUI = NotificationUI;
