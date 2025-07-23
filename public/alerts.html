@@ -5,133 +5,31 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>AWC LMS Notifications</title>
-  <style>
-    body {
-      font-family: Arial, sans-serif;
-      margin: 0;
-      background: #f7f7f7;
-    }
-
-    .navbar {
-      background: #222;
-      color: #fff;
-      padding: 1rem;
-      display: flex;
-      align-items: center;
-    }
-
-    .navbar-title {
-      flex: 1;
-      font-size: 1.2rem;
-    }
-
-    .navbar-notifications {
-      display: flex;
-      gap: 0.5rem;
-    }
-
-    .notification-dot {
-      width: 8px;
-      height: 8px;
-      background: #e74c3c;
-      border-radius: 50%;
-      display: inline-block;
-    }
-
-    .dropdown {
-      position: relative;
-    }
-
-    .dropdown-content {
-      display: none;
-      position: absolute;
-      right: 0;
-      background: #fff;
-      color: #222;
-      min-width: 300px;
-      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
-      z-index: 1;
-      border-radius: 4px;
-      overflow: hidden;
-    }
-
-    .dropdown:hover .dropdown-content {
-      display: block;
-    }
-
-    .dropdown-content .notification-card {
-      border-bottom: 1px solid #eee;
-    }
-
-    .main {
-      max-width: 600px;
-      margin: 2rem auto;
-      background: #fff;
-      border-radius: 8px;
-      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.07);
-      padding: 2rem;
-    }
-
-    .notification-card {
-      padding: 1rem;
-      border-bottom: 1px solid #eee;
-      cursor: pointer;
-      transition: background 0.2s;
-    }
-
-    .notification-card:last-child {
-      border-bottom: none;
-    }
-
-    .notification-card.unread {
-      background: #f0f8ff;
-    }
-
-    .notification-title {
-      font-weight: bold;
-      font-size: 1rem;
-    }
-
-    .notification-date {
-      float: right;
-      color: #888;
-      font-size: 0.9rem;
-    }
-
-    .notification-content {
-      margin: 0.5rem 0;
-      color: #333;
-    }
-
-    .notification-class {
-      color: #666;
-      font-size: 0.9rem;
-    }
-  </style>
+  <link rel="stylesheet" href="style.css">
 </head>
 
 <body>
-    <div class="navbar">
-      <span class="navbar-title">AWC LMS</span>
-      <div class="navbar-notifications">
-        <button id="navbar-mark-all" style="margin-right:0.5rem;">Mark all as read</button>
-        <div class="dropdown">
-          <span>🔔</span>
-          <div class="dropdown-content" id="navbar-notifications-list">
-            <!-- Latest 20 notifications will be rendered here -->
-          </div>
+  <div class="navbar">
+    <span class="navbar-title">AWC LMS</span>
+    <div class="navbar-notifications">
+      <button id="navbar-mark-all" style="margin-right:0.5rem;">Mark all as read</button>
+      <div class="dropdown">
+        <span>🔔</span>
+        <div class="dropdown-content" id="navbar-notifications-list">
+          <!-- Latest 20 notifications will be rendered here -->
         </div>
       </div>
     </div>
-    <div class="main">
-      <h2 style="display:flex;justify-content:space-between;align-items:center;">
-        <span>All Notifications</span>
-        <button id="body-mark-all">Mark all as read</button>
-      </h2>
-      <div id="body-notifications-list">
-        <!-- All notifications (paginated) will be rendered here -->
-      </div>
+  </div>
+  <div class="main">
+    <h2 style="display:flex;justify-content:space-between;align-items:center;">
+      <span>All Notifications</span>
+      <button id="body-mark-all">Mark all as read</button>
+    </h2>
+    <div id="body-notifications-list">
+      <!-- All notifications (paginated) will be rendered here -->
     </div>
+  </div>
   <script type="module" src="../src/modues/alerts/index.js"></script>
 </body>
 
