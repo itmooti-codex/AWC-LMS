@@ -6,9 +6,14 @@ export class NotificationCore {
     this.plugin = plugin;
     this.modelName = modelName;
     this.targetElementId = targetElementId;
+    this.limit = limit;
     this.alertsModel = plugin.switchTo(modelName);
-    this.query = this.alertsModel.query().limit(limit).offset(0).noDestroy();
+    this.query = this.buildQuery();
     this.subscriptions = [];
+  }
+
+  buildQuery() {
+    return this.alertsModel.query().limit(this.limit).offset(0).noDestroy();
   }
 
   async initialFetch() {
@@ -63,7 +68,13 @@ export class NotificationCore {
 
   // For manual refresh if needed
   async forceRefresh() {
+    this.unsubscribeAll();
+    if (this.query && typeof this.query.destroy === 'function') {
+      this.query.destroy();
+    }
+    this.query = this.buildQuery();
     await this.query.fetch().pipe(window.toMainInstance(true)).toPromise();
+    this.subscribeToUpdates();
     this.renderFromState();
   }
-} 
+}
