@@ -13,13 +13,23 @@ const { slug, apiKey } = config;
     const plugin = await sdk.initialize();
     window.tempPlugin ??= plugin;
 
-    // Initialize Notification System
-    const notificationCore = new NotificationCore({ plugin });
-    await notificationCore.initialFetch();
-    notificationCore.subscribeToUpdates();
+    const navEl = document.getElementById('navbar-notifications-list');
+    if (navEl) {
+      const navCore = new NotificationCore({ plugin, limit: 20, targetElementId: 'navbar-notifications-list' });
+      await navCore.initialFetch();
+      navCore.subscribeToUpdates();
+      window.navNotificationCore = navCore;
+    }
 
-    // Expose for debugging/manual refresh
-    window.notificationCore = notificationCore;
+    const bodyEl = document.getElementById('body-notifications-list');
+    if (bodyEl) {
+      const bodyCore = new NotificationCore({ plugin, limit: 5000, targetElementId: 'body-notifications-list' });
+      await bodyCore.initialFetch();
+      bodyCore.subscribeToUpdates();
+      window.bodyNotificationCore = bodyCore;
+    }
+
+    // Expose utils
     window.NotificationUI = NotificationUI;
     window.NotificationUtils = NotificationUtils;
   } catch (err) {
@@ -28,3 +38,4 @@ const { slug, apiKey } = config;
     if (bodyList) bodyList.innerHTML = '<div style="color:red;">Failed to load notifications.</div>';
   }
 })();
+
