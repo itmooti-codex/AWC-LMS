@@ -26,7 +26,10 @@ export class NotificationCore {
   renderFromState() {
     const el = document.getElementById(this.targetElementId);
     if (!el) return;
-    const recs = this.query.getAllRecordsArray().map(NotificationUtils.mapSdkNotificationToUi);
+    const recs = this.query
+      .getAllRecordsArray()
+      .slice(0, this.limit)
+      .map(NotificationUtils.mapSdkNotificationToUi);
     NotificationUI.renderList(recs, el);
   }
 
