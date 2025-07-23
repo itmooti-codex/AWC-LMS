@@ -6,6 +6,8 @@ import { NotificationUtils } from './NotificationUtils.js';
 
 const { slug, apiKey } = config;
 
+window.loggedinuserid ??= 62;
+
 (async function main() {
   try {
     // Initialize SDK

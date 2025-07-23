@@ -13,7 +13,12 @@ export class NotificationCore {
   }
 
   buildQuery() {
-    return this.alertsModel.query().limit(this.limit).offset(0).noDestroy();
+    const q = this.alertsModel.query().limit(this.limit).offset(0).noDestroy();
+    const uid = typeof globalThis.loggedinuserid !== 'undefined' ? globalThis.loggedinuserid : undefined;
+    if (uid !== undefined && uid !== null) {
+      q.where('notified_contact_id', Number(uid));
+    }
+    return q;
   }
 
   async initialFetch() {
