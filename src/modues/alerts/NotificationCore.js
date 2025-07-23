@@ -37,11 +37,13 @@ export class NotificationCore {
     // Clean up previous subscriptions if any
     this.unsubscribeAll();
 
-    // Query subscription: use payload directly
+    // Query subscription: use payload directly to avoid dataset conflicts
     const serverObs = this.query.subscribe ? this.query.subscribe() : this.query.localSubscribe();
     const serverSub = serverObs.pipe(window.toMainInstance(true)).subscribe(
-      () => {
-        this.renderFromState();
+      (payload) => {
+        const recs = (Array.isArray(payload?.records) ? payload.records : Array.isArray(payload) ? payload : [])
+          .map(NotificationUtils.mapSdkNotificationToUi);
+        NotificationUI.renderList(recs, el);
       },
       console.error
     );
