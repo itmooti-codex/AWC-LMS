@@ -111,23 +111,27 @@
 </head>
 
 <body>
-  <div class="navbar">
-    <span class="navbar-title">AWC LMS</span>
-    <div class="navbar-notifications">
-      <div class="dropdown">
-        <span>🔔</span>
-        <div class="dropdown-content" id="navbar-notifications-list">
-          <!-- Latest 20 notifications will be rendered here -->
+    <div class="navbar">
+      <span class="navbar-title">AWC LMS</span>
+      <div class="navbar-notifications">
+        <button id="navbar-mark-all" style="margin-right:0.5rem;">Mark all as read</button>
+        <div class="dropdown">
+          <span>🔔</span>
+          <div class="dropdown-content" id="navbar-notifications-list">
+            <!-- Latest 20 notifications will be rendered here -->
+          </div>
         </div>
       </div>
     </div>
-  </div>
-  <div class="main">
-    <h2>All Notifications</h2>
-    <div id="body-notifications-list">
-      <!-- All notifications (paginated) will be rendered here -->
+    <div class="main">
+      <h2 style="display:flex;justify-content:space-between;align-items:center;">
+        <span>All Notifications</span>
+        <button id="body-mark-all">Mark all as read</button>
+      </h2>
+      <div id="body-notifications-list">
+        <!-- All notifications (paginated) will be rendered here -->
+      </div>
     </div>
-  </div>
   <script type="module" src="../src/modues/alerts/index.js"></script>
 </body>
 
