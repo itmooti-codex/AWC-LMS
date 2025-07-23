@@ -35,9 +35,8 @@ export class NotificationCore {
     // Query subscription: use payload directly
     const serverObs = this.query.subscribe ? this.query.subscribe() : this.query.localSubscribe();
     const serverSub = serverObs.pipe(window.toMainInstance(true)).subscribe(
-      (payload) => {
-        const recs = (Array.isArray(payload) ? payload : []).map(NotificationUtils.mapSdkNotificationToUi);
-        NotificationUI.renderList(recs, el);
+      () => {
+        this.renderFromState();
       },
       console.error
     );
