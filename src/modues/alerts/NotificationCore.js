@@ -1,5 +1,10 @@
 import { NotificationUtils } from './NotificationUtils.js';
 import { NotificationUI } from './NotificationUI.js';
+import { UserConfig } from './userConfig.js';
+
+const userConfig = new UserConfig();
+
+
 
 export class NotificationCore {
   constructor({ plugin, modelName = 'EduflowproAlert', limit, targetElementId }) {

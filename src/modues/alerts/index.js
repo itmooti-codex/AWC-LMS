@@ -6,7 +6,7 @@ import { NotificationUtils } from './NotificationUtils.js';
 
 const { slug, apiKey } = config;
 
-window.loggedinuserid ??= 62;
+
 
 (async function main() {
   try {
@@ -17,7 +17,7 @@ window.loggedinuserid ??= 62;
 
     const navEl = document.getElementById('navbar-notifications-list');
     if (navEl) {
-      const navCore = new NotificationCore({ plugin, limit: 3, targetElementId: 'navbar-notifications-list' });
+      const navCore = new NotificationCore({ plugin, limit: 5, targetElementId: 'navbar-notifications-list' });
       await navCore.initialFetch();
       navCore.subscribeToUpdates();
       window.navNotificationCore = navCore;
