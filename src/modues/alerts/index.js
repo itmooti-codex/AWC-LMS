@@ -51,6 +51,8 @@ const { slug, apiKey } = config;
           .update(q => q.where('id', Number(id)).set({ is_read: true }))
           .execute(true)
           .toPromise();
+        window.navNotificationCore?.forceRefresh();
+        window.bodyNotificationCore?.forceRefresh();
       } catch (err) {
         console.error(err);
       }
