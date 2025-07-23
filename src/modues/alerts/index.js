@@ -14,20 +14,24 @@ const { slug, apiKey } = config;
     window.tempPlugin ??= plugin;
 
     const navEl = document.getElementById('navbar-notifications-list');
-    if (navEl) {
-      const navCore = new NotificationCore({ plugin, limit: 20, targetElementId: 'navbar-notifications-list' });
-      await navCore.initialFetch();
-      navCore.subscribeToUpdates();
-      window.navNotificationCore = navCore;
-    }
-
     const bodyEl = document.getElementById('body-notifications-list');
+
+
     if (bodyEl) {
       const bodyCore = new NotificationCore({ plugin, limit: 5000, targetElementId: 'body-notifications-list' });
       await bodyCore.initialFetch();
       bodyCore.subscribeToUpdates();
       window.bodyNotificationCore = bodyCore;
     }
+
+    if (navEl) {
+      const navCore = new NotificationCore({ plugin, limit: 3, targetElementId: 'navbar-notifications-list' });
+      await navCore.initialFetch();
+      navCore.subscribeToUpdates();
+      window.navNotificationCore = navCore;
+    }
+
+
 
     // Expose utils
     window.NotificationUI = NotificationUI;

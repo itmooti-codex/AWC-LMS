@@ -2,7 +2,7 @@ import { NotificationUtils } from './NotificationUtils.js';
 import { NotificationUI } from './NotificationUI.js';
 
 export class NotificationCore {
-  constructor({ plugin, modelName = 'EduflowproAlert', limit = 500, targetElementId }) {
+  constructor({ plugin, modelName = 'EduflowproAlert', limit, targetElementId }) {
     this.plugin = plugin;
     this.modelName = modelName;
     this.targetElementId = targetElementId;
