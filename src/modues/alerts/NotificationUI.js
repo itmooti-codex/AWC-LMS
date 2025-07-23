@@ -16,7 +16,7 @@ export class NotificationUI {
   static renderNotifications(list) {
     const navbarList = document.getElementById('navbar-notifications-list');
     const bodyList = document.getElementById('body-notifications-list');
-    const navbarHTML = list.slice(0, 20).map(NotificationUI.renderNotificationCard).join('') || '<div style="padding:1rem;">No notifications</div>';
+    const navbarHTML = list.slice(0, 5).map(NotificationUI.renderNotificationCard).join('') || '<div style="padding:1rem;">No notifications</div>';
     const bodyHTML = list.map(NotificationUI.renderNotificationCard).join('') || '<div style="padding:1rem;">No notifications</div>';
     navbarList && (navbarList.innerHTML = navbarHTML);
     bodyList && (bodyList.innerHTML = bodyHTML);
