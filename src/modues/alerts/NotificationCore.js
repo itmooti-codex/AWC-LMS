@@ -2,25 +2,33 @@ import { NotificationUtils } from './NotificationUtils.js';
 import { NotificationUI } from './NotificationUI.js';
 
 export class NotificationCore {
-  constructor({ plugin, modelName = 'EduflowproAlert' }) {
+  constructor({ plugin, modelName = 'EduflowproAlert', limit = 500, targetElementId }) {
     this.plugin = plugin;
     this.modelName = modelName;
+    this.targetElementId = targetElementId;
     this.alertsModel = plugin.switchTo(modelName);
-    this.query = this.alertsModel.query().limit(500).offset(0).noDestroy();
+    this.query = this.alertsModel.query().limit(limit).offset(0).noDestroy();
     this.subscriptions = [];
   }
 
   async initialFetch() {
+    const el = document.getElementById(this.targetElementId);
+    if (!el) return;
     await this.query.fetch().pipe(window.toMainInstance(true)).toPromise();
     this.renderFromState();
   }
 
   renderFromState() {
+    const el = document.getElementById(this.targetElementId);
+    if (!el) return;
     const recs = this.query.getAllRecordsArray().map(NotificationUtils.mapSdkNotificationToUi);
-    NotificationUI.renderNotifications(recs);
+    NotificationUI.renderList(recs, el);
   }
 
   subscribeToUpdates() {
+    const el = document.getElementById(this.targetElementId);
+    if (!el) return;
+
     // Clean up previous subscriptions if any
     this.unsubscribeAll();
 
@@ -29,7 +37,7 @@ export class NotificationCore {
     const serverSub = serverObs.pipe(window.toMainInstance(true)).subscribe(
       (payload) => {
         const recs = (Array.isArray(payload) ? payload : []).map(NotificationUtils.mapSdkNotificationToUi);
-        NotificationUI.renderNotifications(recs);
+        NotificationUI.renderList(recs, el);
       },
       console.error
     );
