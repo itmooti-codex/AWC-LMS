@@ -28,7 +28,7 @@ function hideLoading() {
 function renderPage() {
   const start = (currentPage - 1) * pageSize;
   const page = filteredCourses.slice(start, start + pageSize);
-  CourseUI.renderList(page, document.getElementById('courses-list'));
+  CourseUI.renderList(page, document.getElementById('courses-list'), 'home');
   const totalPages = Math.max(1, Math.ceil(filteredCourses.length / pageSize));
   const indicator = document.getElementById('page-indicator');
   if (indicator) indicator.textContent = `Page ${currentPage} of ${totalPages}`;
