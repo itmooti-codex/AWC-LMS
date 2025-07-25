@@ -32,13 +32,20 @@ export class CourseCore {
   async loadAndRender() {
     const container = document.getElementById(this.targetElementId);
     if (!container) return;
+
     try {
       await this.query.fetch().pipe(window.toMainInstance(true)).toPromise();
-      const recs = this.query.getAllRecordsArray().map(CourseUtils.mapSdkEnrolmentToUi);
+
+      const rawRecords = this.query.getAllRecordsArray() || [];
+      console.log("[DEBUG] rawRecords:", rawRecords);
+
+      const recs = rawRecords.map(CourseUtils.mapSdkEnrolmentToUi);
       CourseUI.renderList(recs, container);
+
     } catch (err) {
-      console.error(err);
+      console.error("CourseCore load failed:", err);
       container.innerHTML = '<div class="p-2 text-red-500">Failed to load courses.</div>';
     }
   }
+
 }
