@@ -3,7 +3,7 @@ import { VitalStatsSDK } from '../../sdk/init.js';
 import { NotificationCore } from './NotificationCore.js';
 import { NotificationUI } from './NotificationUI.js';
 import { NotificationUtils } from './NotificationUtils.js';
-import { initDOMInteractions } from '../dom/DomInit.js';
+import { initDOMInteractions } from './dom/DomInit.js';
 
 const { slug, apiKey } = config;
 

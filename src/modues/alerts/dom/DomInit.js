@@ -1,6 +1,6 @@
-import { DropdownManager } from '../alerts/utils/DropdDownManager.js';
-import { ImageFallback } from '../alerts/utils/ImageFallBack.js';
-import { UserNameRenderer } from '../alerts/utils/UserNameRenderer.js';
+import { DropdownManager } from '../utils/DropdDownManager.js';
+import { ImageFallback } from '../utils/ImageFallBack.js';
+import { UserNameRenderer } from '../utils/UserNameRenderer.js';
 
 export function initDOMInteractions() {
     const dropdown = new DropdownManager();
