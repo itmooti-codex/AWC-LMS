@@ -146,7 +146,13 @@
       <input type="text" id="course-search" placeholder="Search courses..."
         class="border border-gray-300 rounded px-3 py-1 w-full max-w-xs" />
     </div>
-    <div id="courses-list" class="space-y-2"></div>
+    <div id="courses-loading" class="flex justify-center py-8">
+      <svg class="animate-spin h-8 w-8 text-gray-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
+      </svg>
+    </div>
+    <div id="courses-list" class="space-y-2 hidden"></div>
     <div class="flex items-center justify-between mt-4">
       <button id="prev-page" class="px-3 py-1 bg-gray-200 rounded">Prev</button>
       <span id="page-indicator" class="text-sm"></span>
