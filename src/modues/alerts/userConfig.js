@@ -36,11 +36,6 @@ export class UserConfig {
 // Post Comment
 // Post Comment Mention
 
-// Comment
-// Comment Mention
-// Comment Comment
-// Comment Comment Mention
-
 // Submission
 // Submission Mention
 // Submission Comment

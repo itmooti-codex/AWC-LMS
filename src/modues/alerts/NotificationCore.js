@@ -4,8 +4,6 @@ import { UserConfig } from './userConfig.js';
 
 const userConfig = new UserConfig();
 
-
-
 export class NotificationCore {
   constructor({ plugin, modelName = 'EduflowproAlert', limit, targetElementId }) {
     this.plugin = plugin;
@@ -19,7 +17,7 @@ export class NotificationCore {
 
   buildQuery() {
     const q = this.alertsModel.query().limit(this.limit).offset(0).noDestroy();
-    const uid = typeof globalThis.loggedinuserid !== 'undefined' ? globalThis.loggedinuserid : undefined;
+    const uid = typeof userConfig.loggedinuserid !== 'undefined' ? userConfig.loggedinuserid : undefined;
     if (uid !== undefined && uid !== null) {
       q.where('notified_contact_id', Number(uid));
     }
