@@ -91,8 +91,5 @@ const { slug, apiKey } = config;
   }
 })();
 
-onReady(() => {
-  initDOMInteractions();
-});
 
 
