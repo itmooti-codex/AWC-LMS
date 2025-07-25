@@ -1,6 +1,6 @@
 import { NotificationUtils } from './NotificationUtils.js';
 import { NotificationUI } from './NotificationUI.js';
-import { UserConfig } from './userConfig.js';
+import { UserConfig } from '../sdk/userConfig.js';
 
 const userConfig = new UserConfig();
 

@@ -1,6 +1,6 @@
 import { CourseUI } from "./CourseUI.js";
 import { CourseUtils } from './CourseUtils.js';
-import { UserConfig } from './userConfig.js';
+import { UserConfig } from '../sdk/userConfig.js';
 
 export class CourseCore {
   constructor({ plugin, targetElementId, limit = 100 }) {

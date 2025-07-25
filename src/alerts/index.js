@@ -1,10 +1,10 @@
-import { config } from '../../sdk/config.js';
-import { VitalStatsSDK } from '../../sdk/init.js';
+import { config } from '../sdk/config.js';
+import { VitalStatsSDK } from '../sdk/init.js';
 import { NotificationCore } from './NotificationCore.js';
 import { NotificationUI } from './NotificationUI.js';
 import { NotificationUtils } from './NotificationUtils.js';
-import { UserConfig } from './userConfig.js';
-import { initDOMInteractions } from './dom/DomInit.js';
+import { UserConfig } from '../sdk/userConfig.js';
+import { initDOMInteractions } from '../domEvents/DomInit.js';
 
 const { slug, apiKey } = config;
 
