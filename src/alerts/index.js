@@ -90,7 +90,15 @@ const { slug, apiKey } = config;
   }
 })();
 
-document.addEventListener("DOMContentLoaded", () => {
+function onReady(cb) {
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', cb);
+  } else {
+    cb();
+  }
+}
+
+onReady(() => {
   initDOMInteractions();
 });
 

@@ -43,20 +43,18 @@ function applySearch(term) {
   }
 })();
 
-document.addEventListener('DOMContentLoaded', () => {
-  initDOMInteractions();
-  document.getElementById('course-search')?.addEventListener('input', e => applySearch(e.target.value));
-  document.getElementById('prev-page')?.addEventListener('click', () => {
-    if (currentPage > 1) {
-      currentPage--;
-      renderPage();
-    }
-  });
-  document.getElementById('next-page')?.addEventListener('click', () => {
-    const totalPages = Math.ceil(filteredCourses.length / pageSize);
-    if (currentPage < totalPages) {
-      currentPage++;
-      renderPage();
-    }
-  });
+
+document.getElementById('course-search')?.addEventListener('input', e => applySearch(e.target.value));
+document.getElementById('prev-page')?.addEventListener('click', () => {
+  if (currentPage > 1) {
+    currentPage--;
+    renderPage();
+  }
+});
+document.getElementById('next-page')?.addEventListener('click', () => {
+  const totalPages = Math.ceil(filteredCourses.length / pageSize);
+  if (currentPage < totalPages) {
+    currentPage++;
+    renderPage();
+  }
 });
