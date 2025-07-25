@@ -16,7 +16,6 @@ const { slug, apiKey } = config;
     const sdk = new VitalStatsSDK({ slug, apiKey });
     const plugin = await sdk.initialize();
     window.tempPlugin ??= plugin;
-    loadCourses(plugin);
 
     const navEl = document.getElementById('navbar-notifications-list');
     if (navEl) {
@@ -95,76 +94,4 @@ document.addEventListener("DOMContentLoaded", () => {
   initDOMInteractions();
 });
 
-async function loadCourses(plugin) {
-  const container = document.getElementById('navCoursesContainer');
-  if (!container) return;
-  try {
-    const userConfig = new UserConfig();
-    const studentId = userConfig.userId;
-    const gql = `query getEnrolments($student_id: AwcContactID) {
-  getEnrolments(
-    query: [
-      { where: { student_id: $student_id } }
-      {
-        andWhereGroup: [
-          { where: { status: "Active" } }
-          { orWhere: { status: "New" } }
-        ]
-      }
-      {
-        andWhere: {
-          Course: [
-            {
-              whereNot: {
-                course_name: null
-                _OPERATOR_: isNull
-              }
-            }
-          ]
-        }
-      }
-    ]
-  ) {
-    ID: id
-    Course {
-      unique_id
-      course_name
-      image
-    }
-    Class {
-      id
-      unique_id
-    }
-  }
-}`;
-
-    const query = plugin.switchTo('AwcEnrolment').query().fromGraphql(gql);
-    await query
-      .fetch({ variables: { student_id: Number(studentId) } })
-      .pipe(window.toMainInstance(true))
-      .toPromise();
-    const recs = query.getAllRecordsArray();
-    renderCourses(recs);
-  } catch (err) {
-    console.error(err);
-    container.innerHTML = '<div class="p-2 text-red-500">Failed to load courses.</div>';
-  }
-}
-
-function renderCourses(enrolments) {
-  const container = document.getElementById('navCoursesContainer');
-  if (!container) return;
-  const html = (enrolments || [])
-    .map(e => {
-      const c = e.Course || {};
-      const name = c.course_name || '';
-      const img = c.image || '';
-      return `<div class="flex items-center gap-2 p-2 hover:bg-gray-100">`+
-        `<img src="${img}" alt="${name}" class="w-6 h-6 rounded object-cover" />`+
-        `<span class="text-sm">${name}</span>`+
-      `</div>`;
-    })
-    .join('');
-  container.innerHTML = html || '<div class="p-2 text-sm text-gray-500">No courses</div>';
-}
 

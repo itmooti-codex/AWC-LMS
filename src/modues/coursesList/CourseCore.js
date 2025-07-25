@@ -7,7 +7,7 @@ export class CourseCore {
     this.plugin = plugin;
     this.targetElementId = targetElementId;
     this.limit = limit;
-    this.model = plugin.switchTo('AwcEnrolment');
+    this.model = plugin.switchTo('EduflowproEnrolment');
     this.query = this.buildQuery();
   }
 
