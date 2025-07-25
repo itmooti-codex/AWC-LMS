@@ -19,19 +19,35 @@ const { slug, apiKey } = config;
     window.tempPlugin ??= plugin;
 
     const navEl = document.getElementById('navbar-notifications-list');
+    const navLoadingEl = document.getElementById('navbar-notifications-loading');
     if (navEl) {
-      const navCore = new NotificationCore({ plugin, limit: 5, targetElementId: 'navbar-notifications-list' });
-      await navCore.initialFetch();
-      navCore.subscribeToUpdates();
-      window.navNotificationCore = navCore;
+      try {
+        navLoadingEl?.classList.remove('hidden');
+        navEl.classList.add('hidden');
+        const navCore = new NotificationCore({ plugin, limit: 5, targetElementId: 'navbar-notifications-list' });
+        await navCore.initialFetch();
+        navCore.subscribeToUpdates();
+        window.navNotificationCore = navCore;
+      } finally {
+        navLoadingEl?.classList.add('hidden');
+        navEl.classList.remove('hidden');
+      }
     }
 
     const bodyEl = document.getElementById('body-notifications-list');
+    const bodyLoadingEl = document.getElementById('body-notifications-loading');
     if (bodyEl) {
-      const bodyCore = new NotificationCore({ plugin, limit: 5000, targetElementId: 'body-notifications-list' });
-      await bodyCore.initialFetch();
-      bodyCore.subscribeToUpdates();
-      window.bodyNotificationCore = bodyCore;
+      try {
+        bodyLoadingEl?.classList.remove('hidden');
+        bodyEl.classList.add('hidden');
+        const bodyCore = new NotificationCore({ plugin, limit: 5000, targetElementId: 'body-notifications-list' });
+        await bodyCore.initialFetch();
+        bodyCore.subscribeToUpdates();
+        window.bodyNotificationCore = bodyCore;
+      } finally {
+        bodyLoadingEl?.classList.add('hidden');
+        bodyEl.classList.remove('hidden');
+      }
     }
 
     function handleCardClick(e) {
