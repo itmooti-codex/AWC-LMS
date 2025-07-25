@@ -12,6 +12,19 @@ let filteredCourses = [];
 let currentPage = 1;
 const pageSize = 6;
 
+const loadingEl = document.getElementById('courses-loading');
+const listEl = document.getElementById('courses-list');
+
+function showLoading() {
+  loadingEl?.classList.remove('hidden');
+  listEl?.classList.add('hidden');
+}
+
+function hideLoading() {
+  loadingEl?.classList.add('hidden');
+  listEl?.classList.remove('hidden');
+}
+
 function renderPage() {
   const start = (currentPage - 1) * pageSize;
   const page = filteredCourses.slice(start, start + pageSize);
@@ -30,6 +43,7 @@ function applySearch(term) {
 
 (async function main() {
   try {
+    showLoading();
     const sdk = new VitalStatsSDK({ slug, apiKey });
     const plugin = window.tempPlugin || await sdk.initialize();
     const core = new CourseCore({ plugin, targetElementId: 'courses-list', limit: 5000 });
@@ -40,6 +54,8 @@ function applySearch(term) {
     renderPage();
   } catch (err) {
     console.error(err);
+  } finally {
+    hideLoading();
   }
 })();
 
