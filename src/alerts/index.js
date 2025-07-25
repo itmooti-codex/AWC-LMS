@@ -5,6 +5,7 @@ import { NotificationUI } from './NotificationUI.js';
 import { NotificationUtils } from './NotificationUtils.js';
 import { UserConfig } from '../sdk/userConfig.js';
 import { initDOMInteractions } from '../domEvents/DomInit.js';
+import { onReady } from '../utils/onReady.js';
 
 const { slug, apiKey } = config;
 
@@ -89,14 +90,6 @@ const { slug, apiKey } = config;
     if (bodyList) bodyList.innerHTML = '<div style="color:red;">Failed to load notifications.</div>';
   }
 })();
-
-function onReady(cb) {
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', cb);
-  } else {
-    cb();
-  }
-}
 
 onReady(() => {
   initDOMInteractions();
