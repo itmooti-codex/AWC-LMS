@@ -21,6 +21,7 @@ export class CourseCore {
         query.where('status', 'Active').orWhere('status', 'New')
       )
       .andWhere('Course', query => query.whereNot('course_name', 'isNull'))
+    
       .include('Course', q => q.select(['unique_id', 'course_name', 'image']))
       .include('Class', q => q.select(['id', 'unique_id']))
       .limit(this.limit)
