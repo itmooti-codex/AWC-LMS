@@ -3,6 +3,7 @@ import { VitalStatsSDK } from '../../sdk/init.js';
 import { NotificationCore } from './NotificationCore.js';
 import { NotificationUI } from './NotificationUI.js';
 import { NotificationUtils } from './NotificationUtils.js';
+import { initDOMInteractions } from '../dom/DomInit.js';
 
 const { slug, apiKey } = config;
 
@@ -87,4 +88,8 @@ const { slug, apiKey } = config;
     if (bodyList) bodyList.innerHTML = '<div style="color:red;">Failed to load notifications.</div>';
   }
 })();
+
+document.addEventListener("DOMContentLoaded", () => {
+  initDOMInteractions();
+});
 

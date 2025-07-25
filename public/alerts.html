@@ -11,7 +11,7 @@
 
 <body>
   <section class="topNav bg-[#ebf6f6] shadow-lg relative z-50">
-    <div class="navContent flex items-center justify-between max-w-[1200px] mx-auto w-full py-4 px-4">
+    <div class="navContent flex items-center justify-between max-w-[1200px] mx-auto w-full py-4">
       <!-- AWC Logo -->
       <a href="https://courses.writerscentre.com.au/home" aria-label="AWC Home">
         <svg width="94" height="27" viewBox="0 0 94 27" fill="none" xmlns="http://www.w3.org/2000/svg"
@@ -67,6 +67,7 @@
           </div>
         </div>
 
+        <!-- Profile menus -->
         <div class="flex items-center gap-3 relative cursor-pointer" id="profile-toggle">
           <img id="profile-avatar" class="inline-block h-6 w-6 rounded-full ring-2 ring-white object-cover"
             src="[Visitor//Profile Image ##link]" alt="User Avatar" />
@@ -126,6 +127,18 @@
     </div>
   </section>
 
+  <!-- Breadcrumb -->
+  <section class="breadcrumb max-w-[1200px] mx-auto py-8">
+    <div class="h-5 justify-start items-center gap-2 inline-flex">
+      <div class="justify-start items-center gap-2 flex">
+        <a href="https://courses.writerscentre.com.au/home"
+          class="cursor-pointer text-[#414042] text-sm font-normal font-['Open Sans'] leading-tight">Home</a>
+        <div class="text-[#414042] text-sm font-normal font-['Open Sans'] leading-tight">/</div>
+      </div>
+      <div class="text-[#007b8e] text-sm font-normal font-['Open Sans'] leading-tight">Notification</div>
+    </div>
+  </section>
+
   <main class="main p-4 max-w-[1200px] mx-auto">
     <h2 class="flex justify-between items-center text-lg font-semibold text-gray-800 mb-4">
       <span>All Notifications</span>
@@ -140,70 +153,9 @@
 
   <script type="module" src="../src/modues/alerts/index.js"></script>
   <script>
-    // JS for toggles
-    const coursesBtn = document.getElementById("toggle-courses");
-    const coursesDropdown = document.getElementById("courses-dropdown");
-    const notificationsBtn = document.getElementById("toggle-notifications");
-    const notificationsDropdown = document.getElementById("notifications-dropdown");
+    
 
-    coursesBtn.addEventListener("click", () => {
-      coursesDropdown.classList.toggle("hidden");
-      notificationsDropdown.classList.add("hidden");
-    });
 
-    notificationsBtn.addEventListener("click", () => {
-      notificationsDropdown.classList.toggle("hidden");
-      coursesDropdown.classList.add("hidden");
-    });
-
-    // Close dropdowns if clicking outside
-    document.addEventListener("click", (e) => {
-      if (!e.target.closest("#toggle-courses") && !e.target.closest("#courses-dropdown")) {
-        coursesDropdown.classList.add("hidden");
-      }
-      if (!e.target.closest("#toggle-notifications") && !e.target.closest("#notifications-dropdown")) {
-        notificationsDropdown.classList.add("hidden");
-      }
-    });
-  </script>
-
-  <script>
-    document.addEventListener("DOMContentLoaded", function () {
-      const toggle = document.getElementById("profile-toggle");
-      const dropdown = document.getElementById("profile-dropdown");
-      const avatar = document.getElementById("profile-avatar");
-      const dropdownAvatar = document.getElementById("dropdown-avatar");
-      const nameDisplay = document.getElementById("profile-name");
-
-      const fallbackImage = 'https://files.ontraport.com/media/b0456fe87439430680b173369cc54cea.php03bzcx?Expires=4895186056&Signature=fw-mkSjms67rj5eIsiDF9QfHb4EAe29jfz~yn3XT0--8jLdK4OGkxWBZR9YHSh26ZAp5EHj~6g5CUUncgjztHHKU9c9ymvZYfSbPO9JGht~ZJnr2Gwmp6vsvIpYvE1pEywTeoigeyClFm1dHrS7VakQk9uYac4Sw0suU4MpRGYQPFB6w3HUw-eO5TvaOLabtuSlgdyGRie6Ve0R7kzU76uXDvlhhWGMZ7alNCTdS7txSgUOT8oL9pJP832UsasK4~M~Na0ku1oY-8a7GcvvVv6j7yE0V0COB9OP0FbC8z7eSdZ8r7avFK~f9Wl0SEfS6MkPQR2YwWjr55bbJJhZnZA__&Key-Pair-Id=APKAJVAAMVW6XQYWSTNA';
-
-      // Image Fallback
-      [avatar, dropdownAvatar].forEach(img => {
-        const src = img.getAttribute("src");
-        if (!src || src.includes("abc.jpg") || src.trim() === "") {
-          img.src = fallbackImage;
-        }
-      });
-
-      // Name Fallback
-      const displayName = '[Visitor//Display Name]';
-      const firstName = '[Visitor//First Name]';
-      const lastName = '[Visitor//Last Name]';
-      nameDisplay.innerText = displayName.trim() || (firstName.trim() || lastName.trim() ? `${firstName} ${lastName}`.trim() : "Anonymous");
-
-      // Toggle Dropdown
-      toggle.addEventListener("click", (e) => {
-        e.stopPropagation();
-        dropdown.classList.toggle("hidden");
-      });
-
-      // Close on outside click
-      document.addEventListener("click", (e) => {
-        if (!toggle.contains(e.target)) {
-          dropdown.classList.add("hidden");
-        }
-      });
-    });
   </script>
 
 </body>
