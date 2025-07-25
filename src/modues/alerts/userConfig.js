@@ -26,22 +26,3 @@ export class UserConfig {
 }
 
 
-// sample condtion
-// query: [{ where: { alert_type: "Announcement" } }]
-
-
-// Foolowing values are accepted by alert type
-// Post
-// Post Mention
-// Post Comment
-// Post Comment Mention
-
-// Submission
-// Submission Mention
-// Submission Comment
-// Submission Comment Mention
-
-// Announcement
-// Announcement Mention
-// Announcement Comment
-// Announcement Comment Mention

@@ -34,3 +34,6 @@ query getEnrolments($student_id: AwcContactID) {
     }
   }
 }
+
+
+<!-- We use above query to fetch courses. we will student from user config file. We will reuse sdk initliazation. we fetch courses and show name and image in course dropdown in navbar  -->
