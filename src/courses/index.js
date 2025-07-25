@@ -8,7 +8,7 @@ import { CourseCore } from './CourseCore.js';
     const sdk = new VitalStatsSDK({ slug, apiKey });
     const plugin = await sdk.initialize();
     window.tempPlugin ??= plugin;
-    const core = new CourseCore({ plugin, targetElementId: 'navCoursesContainer', limit: 100 });
+    const core = new CourseCore({ plugin, targetElementId: 'navCoursesContainer', limit: 10 });
     core.loadAndRender();
   } catch (err) {
     console.error(err);

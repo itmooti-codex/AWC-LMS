@@ -1,1 +1,0 @@
-Home page added (home.html) with same navbar. Courses are fetched using existing logic and rendered with search and pagination (6 per page).
