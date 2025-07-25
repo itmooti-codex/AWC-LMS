@@ -4,6 +4,7 @@ import { CourseCore } from '../courses/CourseCore.js';
 import { CourseUtils } from '../courses/CourseUtils.js';
 import { CourseUI } from '../courses/CourseUI.js';
 import { initDOMInteractions } from '../domEvents/DomInit.js';
+import { onReady } from '../utils/onReady.js';
 
 const { slug, apiKey } = config;
 
@@ -57,4 +58,8 @@ document.getElementById('next-page')?.addEventListener('click', () => {
     currentPage++;
     renderPage();
   }
+});
+
+onReady(() => {
+  initDOMInteractions();
 });
