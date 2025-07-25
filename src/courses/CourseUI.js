@@ -33,8 +33,9 @@ export class CourseUI {
         </div>
         <div class="body-text text-dark h-[48px] line-clamp-2">${c.description || ''}</div>
         <a href="${url}">
-          <div class="primaryButton w-fit text-[#FFF]">View Course</div>
+          <div class="primaryButton w-fit text-[#ccc]">View Course</div>
         </a>
+        
       </div>
     `;
   }

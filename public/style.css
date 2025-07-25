@@ -1,0 +1,15 @@
+.primaryButton {
+    background: #007b8e !important;
+    border: 1px solid #007b8e !important;
+    padding: 8px 12px !important;
+    outline: none !important;
+    margin: 0 !important;
+    border-radius: 4px !important;
+    transition: 0.2s ease-in-out;
+}
+.primaryButton:hover, .primaryButton:active, .primaryButton:focus {
+    background: #00505c !important;
+    border: 1px solid #00505c !important;
+    color: white !important;
+    box-shadow: 0px 5px 5px 0px rgba(0, 0, 0, 0.12) !important;
+}
