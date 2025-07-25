@@ -1,2 +1,1 @@
-<!-- Now lets create home.html  file and it will take same navbar but show list of course. we will reuse the same course fetch option and allow search too 
-by using course name and use paginatiuon and only show 6 records at a time-->
+Home page added (home.html) with same navbar. Courses are fetched using existing logic and rendered with search and pagination (6 per page).
