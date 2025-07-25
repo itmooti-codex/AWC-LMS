@@ -1,5 +1,5 @@
-import { config } from '../../sdk/config.js';
-import { VitalStatsSDK } from '../../sdk/init.js';
+import { config } from '../sdk/config.js';
+import { VitalStatsSDK } from '../sdk/init.js';
 import { CourseCore } from './CourseCore.js';
 
 (async function main() {
