@@ -34,7 +34,8 @@ function applySearch(term) {
     const plugin = window.tempPlugin || await sdk.initialize();
     const core = new CourseCore({ plugin, targetElementId: 'courses-list', limit: 5000 });
     await core.query.fetch().pipe(window.toMainInstance(true)).toPromise();
-    allCourses = core.query.getAllRecordsArray().map(CourseUtils.mapSdkEnrolmentToUi);
+    const rawRecords = core.query.getAllRecordsArray() || [];
+    allCourses = rawRecords.map(CourseUtils.mapSdkEnrolmentToUi);
     filteredCourses = allCourses;
     renderPage();
   } catch (err) {
