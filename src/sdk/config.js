@@ -5,7 +5,7 @@ export const config = {
 };
 
 // User preference variables (default values)
-export const user_Preference_Turn_Off_All_Notifications = 'Yes';
+export const user_Preference_Turn_Off_All_Notifications = 'No';
 export const Turn_Off_All_Notifications_Time_Unix = '';
 export const user_Preference_Posts = 'Yes';
 export const user_Preference_Post_Comments = 'Yes';

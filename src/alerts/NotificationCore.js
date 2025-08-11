@@ -15,11 +15,38 @@ export class NotificationCore {
     this.subscriptions = [];
   }
 
-  buildQuery() {
+  async fetchClassIds() {
+    // Only fetch for students/teachers
+    if (userConfig.userType === 'admin') return [];
+    const enrolmentModel = this.plugin.switchTo('EduflowproEnrolment');
+    const q = enrolmentModel
+      .query()
+      .select(['id'])
+      .where('student_id', Number(userConfig.userId))
+      .andWhere(query => query.where('status', 'Active').orWhere('status', 'New'))
+      .include('Class', q => q.select(['id']))
+      .limit(1000)
+      .offset(0)
+      .noDestroy();
+    await q.fetch().pipe(window.toMainInstance(true)).toPromise();
+    const recs = q.getAllRecordsArray() || [];
+    // Extract class IDs from enrolments
+    const classIds = recs
+      .map(r => (r.Class && Array.isArray(r.Class) ? r.Class.map(c => c.id) : []))
+      .flat()
+      .filter(Boolean);
+    return classIds;
+  }
+
+  buildQuery(classIds = []) {
     const q = this.alertsModel.query().limit(this.limit).offset(0).noDestroy();
     const uid = typeof userConfig.loggedinuserid !== 'undefined' ? userConfig.loggedinuserid : undefined;
     if (uid !== undefined && uid !== null) {
       q.where('notified_contact_id', Number(uid));
+    }
+    // Only filter by classIds if not admin and classIds provided
+    if (userConfig.userType !== 'admin' && Array.isArray(classIds) && classIds.length > 0) {
+      q.where('parent_class_id', 'in', classIds);
     }
     return q;
   }
@@ -31,6 +58,11 @@ export class NotificationCore {
       NotificationUI.renderList([], el); // Show no notifications
       return;
     }
+    let classIds = [];
+    if (userConfig.userType !== 'admin') {
+      classIds = await this.fetchClassIds();
+    }
+    this.query = this.buildQuery(classIds);
     await this.query.fetch().pipe(window.toMainInstance(true)).toPromise();
     this.renderFromState();
   }
@@ -89,7 +121,11 @@ export class NotificationCore {
     if (this.query && typeof this.query.destroy === 'function') {
       this.query.destroy();
     }
-    this.query = this.buildQuery();
+    let classIds = [];
+    if (userConfig.userType !== 'admin') {
+      classIds = await this.fetchClassIds();
+    }
+    this.query = this.buildQuery(classIds);
     const el = document.getElementById(this.targetElementId);
     if (userConfig.preferences.turnOffAllNotifications === 'Yes') {
       if (el) NotificationUI.renderList([], el);
