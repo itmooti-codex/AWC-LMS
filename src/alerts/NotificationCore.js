@@ -27,6 +27,10 @@ export class NotificationCore {
   async initialFetch() {
     const el = document.getElementById(this.targetElementId);
     if (!el) return;
+    if (userConfig.preferences.turnOffAllNotifications === 'Yes') {
+      NotificationUI.renderList([], el); // Show no notifications
+      return;
+    }
     await this.query.fetch().pipe(window.toMainInstance(true)).toPromise();
     this.renderFromState();
   }
@@ -86,6 +90,11 @@ export class NotificationCore {
       this.query.destroy();
     }
     this.query = this.buildQuery();
+    const el = document.getElementById(this.targetElementId);
+    if (userConfig.preferences.turnOffAllNotifications === 'Yes') {
+      if (el) NotificationUI.renderList([], el);
+      return;
+    }
     await this.query.fetch().pipe(window.toMainInstance(true)).toPromise();
     this.subscribeToUpdates();
     this.renderFromState();
