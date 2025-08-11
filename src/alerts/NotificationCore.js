@@ -40,7 +40,7 @@ export class NotificationCore {
 
   buildQuery(classIds = []) {
     const q = this.alertsModel.query().limit(this.limit).offset(0).noDestroy();
-    const uid = typeof userConfig.loggedinuserid !== 'undefined' ? userConfig.loggedinuserid : undefined;
+    const uid = userConfig.userId;
     if (uid !== undefined && uid !== null) {
       q.where('notified_contact_id', Number(uid));
     }

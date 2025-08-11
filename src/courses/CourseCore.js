@@ -24,7 +24,6 @@ export class CourseCore {
       )
       .andWhere('Course', query => query.whereNot('course_name', 'isNull'))
       .include('Course', q => q.deSelectAll().select(['unique_id', 'course_name', 'image']))
-      .deSelectAll().select(('Course', ['unique_id', 'course_name', 'image']))
       .include('Class', q => q.select(['id', 'unique_id']))
       .limit(this.limit)
       .offset(0)
