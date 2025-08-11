@@ -1,4 +1,5 @@
 import {
+  debug_Notifications,
   user_Preference_Turn_Off_All_Notifications,
   Turn_Off_All_Notifications_Time_Unix,
   user_Preference_Posts,
@@ -22,6 +23,9 @@ export class UserConfig {
     constructor() {
         this.userId = window.loggedinuserid ??= 62;
         this.userType = window.loggedinuserType ??= "Student";
+        this.debug = {
+          notifications: debug_Notifications,
+        };
 
         // Preferences (merge field values resolved already into constants)
         this.preferences = {
