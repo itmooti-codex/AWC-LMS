@@ -17,6 +17,7 @@ export class CourseCore {
     const studentId = userConfig.userId;
     const q = this.model
       .query()
+      .select(['id'])
       .where('student_id', Number(studentId))
       .andWhere(query =>
         query.where('status', 'Active').orWhere('status', 'New')
