@@ -215,7 +215,22 @@ export class NotificationCore {
     const recs = all
       .slice(0, this.limit)
       .map(NotificationUtils.mapSdkNotificationToUi);
-    NotificationUI.renderList(recs, el);
+    const debugInfo = userConfig?.debug?.notifications
+      ? (() => {
+          const counts = all.reduce((acc, r) => {
+            const t = r.alert_type || 'Unknown';
+            acc[t] = (acc[t] || 0) + 1;
+            return acc;
+          }, {});
+          return {
+            total: all.length,
+            byType: counts,
+            sampleIds: all.slice(0, 10).map(r => r.id),
+            lastQueryDebug: this.lastQueryDebug,
+          };
+        })()
+      : undefined;
+    NotificationUI.renderList(recs, el, debugInfo);
   }
 
   subscribeToUpdates() {
@@ -233,9 +248,24 @@ export class NotificationCore {
     const serverObs = this.query.subscribe ? this.query.subscribe() : this.query.localSubscribe();
     const serverSub = serverObs.pipe(window.toMainInstance(true)).subscribe(
       (payload) => {
-        const recs = (Array.isArray(payload?.records) ? payload.records : Array.isArray(payload) ? payload : [])
-          .map(NotificationUtils.mapSdkNotificationToUi);
-        NotificationUI.renderList(recs, el);
+        const raw = Array.isArray(payload?.records) ? payload.records : Array.isArray(payload) ? payload : [];
+        const recs = raw.map(NotificationUtils.mapSdkNotificationToUi);
+        const debugInfo = userConfig?.debug?.notifications
+          ? (() => {
+              const counts = raw.reduce((acc, r) => {
+                const t = r.alert_type || 'Unknown';
+                acc[t] = (acc[t] || 0) + 1;
+                return acc;
+              }, {});
+              return {
+                total: raw.length,
+                byType: counts,
+                sampleIds: raw.slice(0, 10).map(r => r.id),
+                lastQueryDebug: this.lastQueryDebug,
+              };
+            })()
+          : undefined;
+        NotificationUI.renderList(recs, el, debugInfo);
       },
       console.error
     );
