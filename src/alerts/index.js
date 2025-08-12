@@ -6,8 +6,6 @@ import { NotificationUtils } from './NotificationUtils.js';
 
 const { slug, apiKey } = config;
 
-
-
 (async function main() {
   try {
     // Initialize SDK
@@ -34,16 +32,31 @@ const { slug, apiKey } = config;
     const bodyEl = document.getElementById('body-notifications-list');
     const bodyLoadingEl = document.getElementById('body-notifications-loading');
     if (bodyEl) {
-      try {
-        bodyLoadingEl?.classList.remove('hidden');
-        bodyEl.classList.add('hidden');
-        const bodyCore = new NotificationCore({ plugin, limit: 5000, targetElementId: 'body-notifications-list' });
-        await bodyCore.initialFetch();
-        bodyCore.subscribeToUpdates();
-        window.bodyNotificationCore = bodyCore;
-      } finally {
-        bodyLoadingEl?.classList.add('hidden');
-        bodyEl.classList.remove('hidden');
+      const startBody = async () => {
+        try {
+          bodyLoadingEl?.classList.remove('hidden');
+          bodyEl.classList.add('hidden');
+          const bodyCore = new NotificationCore({ plugin, limit: 5000, targetElementId: 'body-notifications-list' });
+          try {
+            bodyCore.renderFromState();
+            if (bodyEl.innerHTML.trim()) {
+              bodyLoadingEl?.classList.add('hidden');
+              bodyEl.classList.remove('hidden');
+            }
+          } catch (_) {}
+          await bodyCore.initialFetch();
+          bodyCore.subscribeToUpdates();
+          window.bodyNotificationCore = bodyCore;
+        } finally {
+          bodyLoadingEl?.classList.add('hidden');
+          bodyEl.classList.remove('hidden');
+        }
+      };
+      // Stagger heavy body load to keep navbar ultra-responsive
+      if (window.requestIdleCallback) {
+        window.requestIdleCallback(() => startBody(), { timeout: 1500 });
+      } else {
+        setTimeout(() => startBody(), 250);
       }
     }
 

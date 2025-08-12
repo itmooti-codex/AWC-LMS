@@ -23,32 +23,27 @@ export class NotificationCore {
     const cacheKey = `${userConfig.userType}:${userConfig.userId}`;
     const cached = classIdsCache.get(cacheKey);
     if (cached?.value) return cached.value;
+
+    // Try persisted cache (speeds up navbar on fresh loads)
+    try {
+      const lsKey = `awc:classIds:${cacheKey}`;
+      const raw = localStorage.getItem(lsKey);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed) && parsed.length) {
+          classIdsCache.set(cacheKey, { value: parsed });
+          // Fire-and-forget background refresh to keep it fresh
+          setTimeout(() => {
+            this.fetchClassIdsNetwork(cacheKey).catch(() => {});
+          }, 0);
+          return parsed;
+        }
+      }
+    } catch (_) {}
+
     if (cached?.promise) return cached.promise;
 
-    const inFlight = (async () => {
-      const enrolmentModel = this.plugin.switchTo('EduflowproEnrolment');
-      const q = enrolmentModel
-        .query()
-        .select(['id'])
-        .where('student_id', Number(userConfig.userId))
-        .include('Class', q => q.select(['id']))
-        .limit(1000)
-        .offset(0)
-        .noDestroy();
-      await q.fetch().pipe(window.toMainInstance(true)).toPromise();
-      const recs = q.getAllRecordsArray() || [];
-      const classIds = recs
-        .map(r => {
-          const c = r.Class;
-          if (!c) return [];
-          if (Array.isArray(c)) return c.map(x => x?.id).filter(Boolean);
-          return [c.id].filter(Boolean);
-        })
-        .flat()
-        .filter(Boolean);
-      // Ensure uniqueness
-      return Array.from(new Set(classIds));
-    })();
+    const inFlight = this.fetchClassIdsNetwork(cacheKey);
 
     classIdsCache.set(cacheKey, { promise: inFlight });
     try {
@@ -59,6 +54,32 @@ export class NotificationCore {
       classIdsCache.delete(cacheKey);
       throw e;
     }
+  }
+
+  async fetchClassIdsNetwork(cacheKey) {
+    const enrolmentModel = this.plugin.switchTo('EduflowproEnrolment');
+    const q = enrolmentModel
+      .query()
+      .select(['id'])
+      .where('student_id', Number(userConfig.userId))
+      .include('Class', q => q.select(['id']))
+      .limit(1000)
+      .offset(0)
+      .noDestroy();
+    await q.fetch().pipe(window.toMainInstance(true)).toPromise();
+    const recs = q.getAllRecordsArray() || [];
+    const classIds = recs
+      .map(r => {
+        const c = r.Class;
+        if (!c) return [];
+        if (Array.isArray(c)) return c.map(x => x?.id).filter(Boolean);
+        return [c.id].filter(Boolean);
+      })
+      .flat()
+      .filter(Boolean);
+    const uniq = Array.from(new Set(classIds));
+    try { localStorage.setItem(`awc:classIds:${cacheKey}`, JSON.stringify(uniq)); } catch (_) {}
+    return uniq;
   }
 
   buildQuery(classIds = []) {
@@ -155,6 +176,19 @@ export class NotificationCore {
       q.limit(0);
     }
 
+    // Apply ordering: latest first (created_at desc)
+    try {
+      let applied = false;
+      if (typeof q.orderBy === 'function') {
+        try { q.orderBy('created_at', 'desc'); applied = true; } catch (_) { }
+        if (!applied) { try { q.orderBy([{ path: ['created_at'], type: 'desc' }]); applied = true; } catch (_) { } }
+      }
+      if (!applied && typeof q.sortBy === 'function') { try { q.sortBy('created_at', 'desc'); applied = true; } catch (_) { } }
+      if (!applied && typeof q.order === 'function') { try { q.order('created_at', 'desc'); applied = true; } catch (_) { } }
+      if (!applied && typeof q.order_by === 'function') { try { q.order_by('created_at', 'desc'); applied = true; } catch (_) { } }
+      if (!applied && typeof q.orderByRaw === 'function') { try { q.orderByRaw('created_at desc'); applied = true; } catch (_) { } }
+    } catch (_) { /* ignore */ }
+
     // Expose debug snapshot for later logging
     this.lastQueryDebug = {
       userId: uid,
@@ -183,6 +217,8 @@ export class NotificationCore {
       return;
     }
     this.query = this.buildQuery(classIds);
+    // Render immediately from any locally-cached state before network completes
+    try { this.renderFromState(); } catch (_) { }
     await this.query.fetch().pipe(window.toMainInstance(true)).toPromise();
     this.renderFromState();
   }
@@ -210,25 +246,25 @@ export class NotificationCore {
           byType: counts,
           sampleIds,
         });
-      } catch (_) {}
+      } catch (_) { }
     }
     const recs = all
       .slice(0, this.limit)
       .map(NotificationUtils.mapSdkNotificationToUi);
     const debugInfo = userConfig?.debug?.notifications
       ? (() => {
-          const counts = all.reduce((acc, r) => {
-            const t = r.alert_type || 'Unknown';
-            acc[t] = (acc[t] || 0) + 1;
-            return acc;
-          }, {});
-          return {
-            total: all.length,
-            byType: counts,
-            sampleIds: all.slice(0, 10).map(r => r.id),
-            lastQueryDebug: this.lastQueryDebug,
-          };
-        })()
+        const counts = all.reduce((acc, r) => {
+          const t = r.alert_type || 'Unknown';
+          acc[t] = (acc[t] || 0) + 1;
+          return acc;
+        }, {});
+        return {
+          total: all.length,
+          byType: counts,
+          sampleIds: all.slice(0, 10).map(r => r.id),
+          lastQueryDebug: this.lastQueryDebug,
+        };
+      })()
       : undefined;
     NotificationUI.renderList(recs, el, debugInfo);
   }
@@ -252,37 +288,26 @@ export class NotificationCore {
         const recs = raw.map(NotificationUtils.mapSdkNotificationToUi);
         const debugInfo = userConfig?.debug?.notifications
           ? (() => {
-              const counts = raw.reduce((acc, r) => {
-                const t = r.alert_type || 'Unknown';
-                acc[t] = (acc[t] || 0) + 1;
-                return acc;
-              }, {});
-              return {
-                total: raw.length,
-                byType: counts,
-                sampleIds: raw.slice(0, 10).map(r => r.id),
-                lastQueryDebug: this.lastQueryDebug,
-              };
-            })()
+            const counts = raw.reduce((acc, r) => {
+              const t = r.alert_type || 'Unknown';
+              acc[t] = (acc[t] || 0) + 1;
+              return acc;
+            }, {});
+            return {
+              total: raw.length,
+              byType: counts,
+              sampleIds: raw.slice(0, 10).map(r => r.id),
+              lastQueryDebug: this.lastQueryDebug,
+            };
+          })()
           : undefined;
         NotificationUI.renderList(recs, el, debugInfo);
       },
       console.error
     );
 
-    // Plugin subscription (optional, for extra safety)
-    const pluginSub = this.plugin.subscribe(p => {
-      if (p.__changes && p.__changes[this.modelName] === 'updated' && p.__changesEvent === 'commit') {
-        this.renderFromState();
-      }
-    });
-
-    // Model subscription (optional, for extra safety)
-    const modelSub = this.alertsModel.subscribe(() => {
-      this.renderFromState();
-    });
-
-    this.subscriptions = [serverSub, pluginSub, modelSub];
+    // Keep only the query subscription to avoid duplicate update streams
+    this.subscriptions = [serverSub];
   }
 
   unsubscribeAll() {
