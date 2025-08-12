@@ -1,7 +1,3 @@
-// AlertCreator: Modular helpers to create alerts via the VitalStats SDK
-// - Reuses the existing SDK initializer (src/sdk/init.js)
-// - Exposes both a named export and a global helper for convenient usage
-
 import { config } from '../sdk/config.js';
 import { VitalStatsSDK } from '../sdk/init.js';
 
@@ -34,7 +30,6 @@ const ALLOWED_FIELDS = new Set([
   'parent_post_id',
   'parent_submission_id',
   'title',
-  'unique_id',
 ]);
 
 export function buildAlertPayload(payload = {}) {
