@@ -10,9 +10,9 @@ export function initDOMInteractions() {
     const fallbackImage = 'https://files.ontraport.com/media/b0456fe87439430680b173369cc54cea.php03bzcx?...';
 
     // Dropdown setup
-    dropdown.toggle("toggle-courses", "courses-dropdown", ["notifications-dropdown", "profile-dropdown"]);
+    dropdown.toggle("toggle-courses", "courses-dropdown", ["notifications-dropdown", "profile-dropdown"], "chevron-icon");
     dropdown.toggle("toggle-notifications", "notifications-dropdown", ["courses-dropdown", "profile-dropdown"]);
-    dropdown.toggle("profile-toggle", "profile-dropdown", ["courses-dropdown", "notifications-dropdown"]);
+    dropdown.toggle("profile-toggle", "profile-dropdown", ["courses-dropdown", "notifications-dropdown"], "profile-chevron");
 
     // Fallback images
     fallback.apply(document.getElementById("profile-avatar"), fallbackImage);

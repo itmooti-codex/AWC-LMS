@@ -18,9 +18,10 @@ export class NotificationCore {
   }
 
   async fetchClassIds() {
-    // Only fetch for students/teachers
-    if (userConfig.userType === 'admin') return [];
-    const cacheKey = `${userConfig.userType}:${userConfig.userId}`;
+    // Only fetch for students/teachers; admins do not constrain by classes
+    const userType = String(userConfig.userType || '').toLowerCase();
+    if (userType === 'admin') return [];
+    const cacheKey = `${userType}:${userConfig.userId}`;
     const cached = classIdsCache.get(cacheKey);
     if (cached?.value) return cached.value;
 
@@ -43,7 +44,7 @@ export class NotificationCore {
 
     if (cached?.promise) return cached.promise;
 
-    const inFlight = this.fetchClassIdsNetwork(cacheKey);
+    const inFlight = this.fetchClassIdsNetwork(cacheKey, userType);
 
     classIdsCache.set(cacheKey, { promise: inFlight });
     try {
@@ -56,27 +57,45 @@ export class NotificationCore {
     }
   }
 
-  async fetchClassIdsNetwork(cacheKey) {
-    const enrolmentModel = this.plugin.switchTo('EduflowproEnrolment');
-    const q = enrolmentModel
-      .query()
-      .select(['id'])
-      .where('student_id', Number(userConfig.userId))
-      .include('Class', q => q.select(['id']))
-      .limit(1000)
-      .offset(0)
-      .noDestroy();
-    await q.fetch().pipe(window.toMainInstance(true)).toPromise();
-    const recs = q.getAllRecordsArray() || [];
-    const classIds = recs
-      .map(r => {
-        const c = r.Class;
-        if (!c) return [];
-        if (Array.isArray(c)) return c.map(x => x?.id).filter(Boolean);
-        return [c.id].filter(Boolean);
-      })
-      .flat()
-      .filter(Boolean);
+  async fetchClassIdsNetwork(cacheKey, userType) {
+    const uid = Number(userConfig.userId);
+    let classIds = [];
+    if (userType === 'teacher') {
+      // Teachers: find classes where instructor_id = user
+      const classModel = this.plugin.switchTo('EduflowproClass');
+      const q = classModel
+        .query()
+        .select(['id'])
+        .where('instructor_id', uid)
+        .limit(1000)
+        .offset(0)
+        .noDestroy();
+      await q.fetch().pipe(window.toMainInstance(true)).toPromise();
+      const recs = q.getAllRecordsArray() || [];
+      classIds = recs.map(r => r.id).filter(Boolean);
+    } else {
+      // Students: enrolments -> classes
+      const enrolmentModel = this.plugin.switchTo('EduflowproEnrolment');
+      const q = enrolmentModel
+        .query()
+        .select(['id'])
+        .where('student_id', uid)
+        .include('Class', q1 => q1.select(['id']))
+        .limit(1000)
+        .offset(0)
+        .noDestroy();
+      await q.fetch().pipe(window.toMainInstance(true)).toPromise();
+      const recs = q.getAllRecordsArray() || [];
+      classIds = recs
+        .map(r => {
+          const c = r.Class;
+          if (!c) return [];
+          if (Array.isArray(c)) return c.map(x => x?.id).filter(Boolean);
+          return [c.id].filter(Boolean);
+        })
+        .flat()
+        .filter(Boolean);
+    }
     const uniq = Array.from(new Set(classIds));
     try { localStorage.setItem(`awc:classIds:${cacheKey}`, JSON.stringify(uniq)); } catch (_) {}
     return uniq;
@@ -91,7 +110,7 @@ export class NotificationCore {
       hasCondition = true;
     }
     // For non-admin users, always constrain by class IDs. If none, return no records.
-    if (userConfig.userType !== 'admin') {
+    if (String(userConfig.userType || '').toLowerCase() !== 'admin') {
       const ids = Array.isArray(classIds) ? classIds : [];
       if (ids.length === 0) {
         // No classes → no alerts
@@ -207,11 +226,11 @@ export class NotificationCore {
       return;
     }
     let classIds = [];
-    if (userConfig.userType !== 'admin') {
+    if (String(userConfig.userType || '').toLowerCase() !== 'admin') {
       classIds = await this.fetchClassIds();
     }
     this.classIds = classIds;
-    if (userConfig.userType !== 'admin' && (!Array.isArray(classIds) || classIds.length === 0)) {
+    if (String(userConfig.userType || '').toLowerCase() !== 'admin' && (!Array.isArray(classIds) || classIds.length === 0)) {
       // No classes → do not fetch
       NotificationUI.renderList([], el);
       return;

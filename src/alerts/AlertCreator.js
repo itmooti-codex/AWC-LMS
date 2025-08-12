@@ -37,7 +37,7 @@ const ALLOWED_FIELDS = new Set([
   'unique_id',
 ]);
 
-function cleanPayload(payload = {}) {
+export function buildAlertPayload(payload = {}) {
   const out = {};
   Object.keys(payload || {}).forEach(k => {
     if (ALLOWED_FIELDS.has(k)) out[k] = payload[k];
@@ -81,7 +81,7 @@ async function tryCreateViaGraphQL(plugin, payload) {
 
 export async function createAlert(payload = {}) {
   const plugin = await getPlugin();
-  const clean = cleanPayload(payload);
+  const clean = buildAlertPayload(payload);
   try {
     return await tryCreateViaMutation(plugin, clean);
   } catch (_) {
@@ -97,7 +97,7 @@ export async function createAlerts(payloads = [], { concurrency = 3 } = {}) {
   async function worker() {
     while (idx < list.length) {
       const i = idx++;
-      const p = cleanPayload(list[i]);
+      const p = buildAlertPayload(list[i]);
       try {
         await tryCreateViaMutation(plugin, p);
       } catch (_) {
@@ -114,4 +114,4 @@ export async function createAlerts(payloads = [], { concurrency = 3 } = {}) {
 window.AWC ??= {};
 window.AWC.createAlert = createAlert;
 window.AWC.createAlerts = createAlerts;
-
+window.AWC.buildAlertPayload = buildAlertPayload;
