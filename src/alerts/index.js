@@ -17,10 +17,18 @@ const { slug, apiKey } = config;
     const navLoadingEl = document.getElementById('navbar-notifications-loading');
     let navReadyPromise = Promise.resolve();
     if (navEl) {
-      navLoadingEl?.classList.remove('hidden');
-      navEl.classList.add('hidden');
-      const navCore = new NotificationCore({ plugin, limit: 5, targetElementId: 'navbar-notifications-list' });
+      const navCore = new NotificationCore({ plugin, limit: 50, targetElementId: 'navbar-notifications-list', scope: 'nav' });
       window.navNotificationCore = navCore;
+      const hadCache = navCore.preRenderFromCache();
+      if (hadCache) {
+        navLoadingEl?.classList.add('hidden');
+        navEl.classList.remove('hidden');
+      } else {
+        // Use skeleton in nav instead of spinner
+        navLoadingEl?.classList.add('hidden');
+        navEl.classList.remove('hidden');
+        NotificationUI.renderSkeleton(navEl, 3, 'nav');
+      }
       navReadyPromise = navCore.start().then(() => {
         navLoadingEl?.classList.add('hidden');
         navEl.classList.remove('hidden');
@@ -37,14 +45,20 @@ const { slug, apiKey } = config;
       const startBody = async () => {
         bodyLoadingEl?.classList.remove('hidden');
         bodyEl.classList.add('hidden');
-        const bodyCore = new NotificationCore({ plugin, limit: undefined, targetElementId: 'body-notifications-list' });
+        const bodyCore = new NotificationCore({ plugin, limit: undefined, targetElementId: 'body-notifications-list', scope: 'body' });
         window.bodyNotificationCore = bodyCore;
-        try {
-          await bodyCore.start();
-        } finally {
+        const hadCache = bodyCore.preRenderFromCache();
+        if (hadCache) {
           bodyLoadingEl?.classList.add('hidden');
           bodyEl.classList.remove('hidden');
+        } else {
+          bodyLoadingEl?.classList.remove('hidden');
+          bodyEl.classList.add('hidden');
         }
+        await bodyCore.start().finally(() => {
+          bodyLoadingEl?.classList.add('hidden');
+          bodyEl.classList.remove('hidden');
+        });
       };
       // Start body after nav first emission + additional delay to reduce contention
       const scheduleBody = () => {

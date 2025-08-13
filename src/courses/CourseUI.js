@@ -1,6 +1,32 @@
 import { UserConfig } from '../sdk/userConfig.js';
 
 export class CourseUI {
+  static renderNavSkeleton(container, count = 3) {
+    if (!container) return;
+    const items = Array.from({ length: count }).map(() => `
+      <div class="flex items-center gap-2 p-2">
+        <div class="w-6 h-6 rounded bg-gray-200 animate-pulse"></div>
+        <div class="h-4 w-28 bg-gray-200 rounded animate-pulse"></div>
+      </div>
+    `).join('');
+    container.innerHTML = items;
+  }
+
+  static renderHomeSkeleton(container, count = 6) {
+    if (!container) return;
+    const items = Array.from({ length: count }).map(() => `
+      <div class="bg-white p-4 flex flex-col gap-4 animate-pulse">
+        <div class="w-full h-[180px] bg-gray-200 rounded"></div>
+        <div class="flex flex-col gap-2">
+          <div class="h-5 w-1/2 bg-gray-200 rounded"></div>
+          <div class="h-4 w-2/3 bg-gray-200 rounded"></div>
+        </div>
+        <div class="h-4 w-24 bg-gray-200 rounded"></div>
+        <div class="h-10 w-28 bg-gray-200 rounded"></div>
+      </div>
+    `).join('');
+    container.innerHTML = items;
+  }
   static renderNavItem(c) {
     const img = c.courseImage || '';
     const name = c.courseName || '';

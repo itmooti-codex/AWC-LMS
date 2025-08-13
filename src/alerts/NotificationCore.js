@@ -7,11 +7,12 @@ const userConfig = new UserConfig();
 const classIdsCache = new Map(); // key: `${userConfig.userType}:${userConfig.userId}` -> { value: number[], promise?: Promise<number[]> }
 
 export class NotificationCore {
-  constructor({ plugin, modelName = 'EduflowproAlert', limit, targetElementId }) {
+  constructor({ plugin, modelName = 'EduflowproAlert', limit, targetElementId, scope }) {
     this.plugin = plugin;
     this.modelName = modelName;
     this.targetElementId = targetElementId;
     this.limit = limit;
+    this.scope = scope || ((Number.isFinite(limit) && limit > 0 && limit <= 10) ? 'nav' : 'body');
     this.alertsModel = plugin.switchTo(modelName);
     this.query = null;
     this.subscriptions = [];
@@ -240,6 +241,80 @@ export class NotificationCore {
     };
     return q;
   }
+
+  // Cache Helpers
+  // Lightweight stable hash for keys
+  hashKey(str) {
+    try {
+      let h = 5381;
+      for (let i = 0; i < str.length; i++) h = ((h << 5) + h) ^ str.charCodeAt(i);
+      return (h >>> 0).toString(36);
+    } catch (_) { return String(Math.abs(str.length || 0)); }
+  }
+  prefsSignature() {
+    try {
+      const prefs = userConfig?.preferences || {};
+      const keys = Object.keys(prefs).sort();
+      const sig = keys.map(k => `${k}:${prefs[k]}`).join('|');
+      return this.hashKey(sig);
+    } catch (_) { return 'p0'; }
+  }
+  classSignature(classIds = []) {
+    try {
+      const ids = Array.isArray(classIds) ? classIds.slice().sort((a,b)=>Number(a)-Number(b)) : [];
+      return this.hashKey(ids.join(','));
+    } catch (_) { return 'c0'; }
+  }
+  cacheKey(classIds) {
+    const uid = userConfig.userId ?? 'anon';
+    const type = String(userConfig.userType || 'unknown').toLowerCase();
+    const pSig = this.prefsSignature();
+    const cSig = this.classSignature(classIds || this.classIds || []);
+    return `awc:alerts:v1:${this.scope}:${type}:${uid}:${pSig}:${cSig}`;
+  }
+  readCache(classIds) {
+    try {
+      const raw = localStorage.getItem(this.cacheKey(classIds));
+      if (!raw) return null;
+      const parsed = JSON.parse(raw);
+      if (!parsed || typeof parsed !== 'object') return null;
+      const ttlMs = this.scope === 'nav' ? 120000 : 180000; // 2-3 min TTL
+      if (!parsed.ts || (Date.now() - parsed.ts) > ttlMs) return null;
+      if (parsed.uid !== userConfig.userId) return null;
+      if (!Array.isArray(parsed.list)) return null;
+      return parsed.list;
+    } catch (_) { return null; }
+  }
+  writeCache(list, classIds) {
+    try {
+      const cap = this.scope === 'nav' ? (this.limit || 5) : 100;
+      const trimmed = Array.isArray(list) ? list.slice(0, cap) : [];
+      const value = JSON.stringify({ ts: Date.now(), uid: userConfig.userId, list: trimmed });
+      localStorage.setItem(this.cacheKey(classIds), value);
+    } catch (_) {}
+  }
+  getCachedClassIdsSync() {
+    try {
+      const userType = String(userConfig.userType || '').toLowerCase();
+      const key = `awc:classIds:${userType}:${userConfig.userId}`;
+      const raw = localStorage.getItem(key);
+      if (!raw) return [];
+      const parsed = JSON.parse(raw);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch (_) { return []; }
+  }
+  preRenderFromCache() {
+    const el = document.getElementById(this.targetElementId);
+    if (!el) return false;
+    // Try using known classIds first, otherwise attempt sync read of classIds cache
+    const hintClassIds = Array.isArray(this.classIds) ? this.classIds : this.getCachedClassIdsSync();
+    const cached = this.readCache(hintClassIds);
+    if (!cached) return false;
+    try {
+      NotificationUI.renderList(cached, el);
+      return true;
+    } catch (_) { return false; }
+  }
   async start() {
     const el = document.getElementById(this.targetElementId);
     if (!el) return;
@@ -268,6 +343,8 @@ export class NotificationCore {
         // Apply client-side slicing only if no server-side limit was set
         const sliced = (!Number.isFinite(this.limit) || this.limit <= 0) ? raw : raw.slice(0, this.limit);
         const recs = sliced.map(NotificationUtils.mapSdkNotificationToUi);
+        // Persist to cache for faster warm loads
+        this.writeCache(recs, this.classIds);
         const debugInfo = userConfig?.debug?.notifications
           ? (() => {
             const counts = raw.reduce((acc, r) => {

@@ -38,17 +38,26 @@
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
             </svg>
           </button>
-          <div id="courses-dropdown" class="hidden absolute top-12 right-0 w-[350px] bg-white rounded-md shadow-lg z-40">
-            <div id="nav-courses-loading" class="flex justify-center py-2">
-              <svg class="animate-spin h-5 w-5 text-gray-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
-              </svg>
+          <div id="courses-dropdown"
+            class="hidden absolute top-12 right-0 w-[350px] bg-white rounded-md shadow-lg z-40">
+            <div id="nav-courses-loading" class="p-2 space-y-2">
+              <div class="flex items-center gap-2">
+                <div class="w-6 h-6 rounded bg-gray-200 animate-pulse"></div>
+                <div class="h-4 w-28 bg-gray-200 rounded animate-pulse"></div>
+              </div>
+              <div class="flex items-center gap-2">
+                <div class="w-6 h-6 rounded bg-gray-200 animate-pulse"></div>
+                <div class="h-4 w-24 bg-gray-200 rounded animate-pulse"></div>
+              </div>
+              <div class="flex items-center gap-2">
+                <div class="w-6 h-6 rounded bg-gray-200 animate-pulse"></div>
+                <div class="h-4 w-20 bg-gray-200 rounded animate-pulse"></div>
+              </div>
             </div>
             <div id="navCoursesContainer" class="space-y-2 hidden p-2 ">
               <!-- Populated via JS -->
             </div>
-            <a href = "home.html" class = "flex items-center justify-center p-2 border-t">View All</a>
+            <a href="home.html" class="flex items-center justify-center p-2 border-t">View All</a>
           </div>
         </div>
 
@@ -72,31 +81,59 @@
                   <label class="flex items-center gap-2 cursor-pointer select-none">
                     <span class="text-[#586a80] text-xs">Only show unread</span>
                     <input id="navbar-unread-toggle" type="checkbox" class="peer sr-only" />
-                    <span class="w-7 h-4 rounded-full bg-[#BFBFBF] relative transition-colors duration-300 peer-checked:bg-[#007C8F]">
-                      <span class="absolute top-[2px] left-[2px] w-3 h-3 bg-white rounded-full transition-transform duration-300 peer-checked:translate-x-[12px]"></span>
+                    <span
+                      class="w-7 h-4 rounded-full bg-[#BFBFBF] relative transition-colors duration-300 peer-checked:bg-[#007C8F]">
+                      <span
+                        class="absolute top-[2px] left-[2px] w-3 h-3 bg-white rounded-full transition-transform duration-300 peer-checked:translate-x-[12px]"></span>
                     </span>
                   </label>
                   <button id="navbar-mark-all" class="text-xs text-[#007C8F] hover:underline">Mark all as read</button>
                 </div>
               </div>
-              <div class="text-[#007c8f] text-xs mt-2">Yellow indicates you have not clicked to read the post/comment/reply.</div>
+              <div class="text-[#007c8f] text-xs mt-2">Yellow indicates you have not clicked to read the
+                post/comment/reply.</div>
             </div>
             <div class="px-3 pt-2">
               <div class="flex items-center gap-4 text-sm">
-                <button id="navbar-tab-all" class="pb-2 text-[#007C8F] font-semibold border-b-2 border-[#007C8F]">All</button>
-                <button id="navbar-tab-announcements" class="pb-2 text-[#586A80] hover:text-[#007C8F]">Announcements</button>
+                <button id="navbar-tab-all"
+                  class="pb-2 text-[#007C8F] font-semibold border-b-2 border-[#007C8F]">All</button>
+                <button id="navbar-tab-announcements"
+                  class="pb-2 text-[#586A80] hover:text-[#007C8F]">Announcements</button>
               </div>
             </div>
-            <div id="navbar-notifications-loading" class="flex justify-center py-3">
-              <svg class="animate-spin h-5 w-5 text-gray-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
-              </svg>
+            <div id="navbar-notifications-loading" class="p-3 space-y-2">
+              <div class="animate-pulse">
+                <div class="flex justify-between items-start gap-2">
+                  <div class="flex-1 space-y-2">
+                    <div class="h-3 bg-gray-200 rounded w-2/3"></div>
+                    <div class="h-3 bg-gray-200 rounded w-5/6"></div>
+                  </div>
+                  <div class="w-10 h-3 bg-gray-200 rounded"></div>
+                </div>
+              </div>
+              <div class="animate-pulse">
+                <div class="flex justify-between items-start gap-2">
+                  <div class="flex-1 space-y-2">
+                    <div class="h-3 bg-gray-200 rounded w-1/2"></div>
+                    <div class="h-3 bg-gray-200 rounded w-4/5"></div>
+                  </div>
+                  <div class="w-10 h-3 bg-gray-200 rounded"></div>
+                </div>
+              </div>
+              <div class="animate-pulse">
+                <div class="flex justify-between items-start gap-2">
+                  <div class="flex-1 space-y-2">
+                    <div class="h-3 bg-gray-200 rounded w-3/5"></div>
+                    <div class="h-3 bg-gray-200 rounded w-2/3"></div>
+                  </div>
+                  <div class="w-10 h-3 bg-gray-200 rounded"></div>
+                </div>
+              </div>
             </div>
             <div id="navbar-notifications-list" class="space-y-2 hidden p-3">
               <!-- Notifications go here -->
             </div>
-            <a href="./alerts.html" class = "flex items-center justify-center p-2 border-t">View All</a>
+            <a href="./alerts.html" class="flex items-center justify-center p-2 border-t">View All</a>
           </div>
         </div>
 
@@ -187,8 +224,10 @@
         <label class="flex items-center gap-2 cursor-pointer select-none text-xs text-[#586A80]">
           <span>Only show unread</span>
           <input id="body-unread-toggle" type="checkbox" class="peer sr-only" />
-          <span class="w-7 h-4 rounded-full bg-[#BFBFBF] relative transition-colors duration-300 peer-checked:bg-[#007C8F]">
-            <span class="absolute top-[2px] left-[2px] w-3 h-3 bg-white rounded-full transition-transform duration-300 peer-checked:translate-x-[12px]"></span>
+          <span
+            class="w-7 h-4 rounded-full bg-[#BFBFBF] relative transition-colors duration-300 peer-checked:bg-[#007C8F]">
+            <span
+              class="absolute top-[2px] left-[2px] w-3 h-3 bg-white rounded-full transition-transform duration-300 peer-checked:translate-x-[12px]"></span>
           </span>
         </label>
       </div>

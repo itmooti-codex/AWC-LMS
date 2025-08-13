@@ -17,8 +17,12 @@ const listEl = document.getElementById('courses-list');
 const paginationEl = document.getElementById('pagination');
 
 function showLoading() {
-  loadingEl?.classList.remove('hidden');
-  listEl?.classList.add('hidden');
+  // Prefer skeletons in the list container
+  if (listEl) {
+    listEl.classList.remove('hidden');
+    try { CourseUI.renderHomeSkeleton(listEl, pageSize); } catch (_) {}
+  }
+  loadingEl?.classList.add('hidden');
 }
 
 function hideLoading() {
@@ -111,4 +115,3 @@ function applySearch(term) {
   }
 })();
 document.getElementById('course-search')?.addEventListener('input', e => applySearch(e.target.value));
-

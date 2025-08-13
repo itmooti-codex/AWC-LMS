@@ -4,6 +4,36 @@ import { UserConfig } from '../sdk/userConfig.js';
 const userConfig = new UserConfig();
 
 export class NotificationUI {
+  static skeletonItem(variant = 'nav') {
+    if (variant === 'nav') {
+      return `
+        <div class="p-2">
+          <div class="flex items-center gap-2">
+            <div class="w-6 h-6 rounded bg-gray-200 animate-pulse"></div>
+            <div class="h-4 w-32 bg-gray-200 rounded animate-pulse"></div>
+          </div>
+        </div>
+      `;
+    }
+    // body/default
+    return `
+      <div class="p-2">
+        <div class="p-2 items-start gap-2 rounded justify-between w-full flex bg-gray-50">
+          <div class="flex flex-col gap-2 w-full">
+            <div class="h-4 w-40 bg-gray-200 rounded animate-pulse"></div>
+            <div class="h-4 w-full bg-gray-200 rounded animate-pulse"></div>
+          </div>
+          <div class="h-3 w-12 bg-gray-200 rounded animate-pulse"></div>
+        </div>
+      </div>
+    `;
+  }
+
+  static renderSkeleton(container, count = 3, variant = 'nav') {
+    if (!container) return;
+    const items = Array.from({ length: count }).map(() => NotificationUI.skeletonItem(variant)).join('');
+    container.innerHTML = items;
+  }
   static renderNotificationCard(n) {
     const time = NotificationUtils.timeAgo(n.Date_Added * 1000);
     return `
