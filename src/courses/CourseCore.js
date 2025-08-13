@@ -1,13 +1,17 @@
 import { CourseUI } from "./CourseUI.js";
+import { CacheTTLs } from '../utils/cacheConfig.js';
 import { CourseUtils } from './CourseUtils.js';
 import { UserConfig } from '../sdk/userConfig.js';
 
 export class CourseCore {
-  constructor({ plugin, targetElementId, loadingElementId, limit = 100 }) {
+  constructor({ plugin, targetElementId, loadingElementId, limit = 100, scope = 'nav', alreadyRendered = false }) {
     this.plugin = plugin;
     this.targetElementId = targetElementId;
     this.loadingElementId = loadingElementId;
     this.limit = limit;
+    this.scope = scope; // 'nav' | 'home'
+    this.lastSig = null;
+    this.alreadyRendered = alreadyRendered;
     this.query = this.buildQuery();
   }
 
@@ -57,17 +61,85 @@ export class CourseCore {
       : null;
     if (!container) return;
     try {
-      if (loadingEl) loadingEl.classList.remove('hidden');
-      container.classList.add('hidden');
+      // If we already pre-rendered outside, skip cache render to prevent flicker
+      if (!this.alreadyRendered) {
+        // Try to keep UI responsive: if cache exists, show it immediately
+        const cached = this.readCache();
+        if (Array.isArray(cached) && cached.length) {
+          try { CourseUI.renderList(cached, container, this.scope === 'home' ? 'home' : undefined); } catch (_) {}
+          container.classList.remove('hidden');
+          loadingEl?.classList.add('hidden');
+          this.lastSig = this.listSignature(cached);
+        } else {
+          if (loadingEl) loadingEl.classList.remove('hidden');
+          container.classList.add('hidden');
+        }
+      }
       await this.query.fetch().pipe(window.toMainInstance(true)).toPromise();
       const rawRecords = this.query.getAllRecordsArray() || [];
       const recs = rawRecords.map(CourseUtils.mapSdkEnrolmentToUi);
-      CourseUI.renderList(recs, container);
+      // Persist fresh list for warm reloads
+      this.writeCache(recs);
+      const newSig = this.listSignature(recs);
+      if (this.lastSig && newSig === this.lastSig) {
+        // No changes; avoid unnecessary re-render
+      } else {
+        CourseUI.renderList(recs, container, this.scope === 'home' ? 'home' : undefined);
+        this.lastSig = newSig;
+      }
       container.classList.remove('hidden');
     } catch (err) {
       container.innerHTML = '<div class="p-2 text-red-500">Failed to load courses.</div>';
     } finally {
       if (loadingEl) loadingEl.classList.add('hidden');
     }
+  }
+
+  // Caching helpers (localStorage)
+  cacheKey() {
+    try {
+      const { userId, userType } = new UserConfig();
+      const type = String(userType || 'unknown').toLowerCase();
+      const scope = this.scope || (Number.isFinite(this.limit) && this.limit <= 12 ? 'nav' : 'home');
+      return `awc:courses:${scope}:${type}:${userId}:${this.limit || 'all'}`;
+    } catch (_) {
+      return `awc:courses:${this.scope || 'nav'}:anon`;
+    }
+  }
+  readCache() {
+    try {
+      const raw = localStorage.getItem(this.cacheKey());
+      if (!raw) return null;
+      const parsed = JSON.parse(raw);
+      if (!parsed || typeof parsed !== 'object') return null;
+      const ttlMs = (this.scope === 'nav') ? CacheTTLs.courses.nav() : CacheTTLs.courses.home();
+      if (!parsed.ts || (Date.now() - parsed.ts) > ttlMs) return null;
+      return Array.isArray(parsed.list) ? parsed.list : null;
+    } catch (_) { return null; }
+  }
+  writeCache(list) {
+    try {
+      const cap = (this.scope === 'nav') ? (this.limit || 10) : 500;
+      const trimmed = Array.isArray(list) ? list.slice(0, cap) : [];
+      const payload = JSON.stringify({ ts: Date.now(), sig: this.listSignature(trimmed), list: trimmed });
+      localStorage.setItem(this.cacheKey(), payload);
+    } catch (_) { /* ignore */ }
+  }
+
+  // Generate a stable signature for list content to avoid re-rendering unchanged UI
+  hashKey(str) {
+    try {
+      let h = 5381;
+      for (let i = 0; i < str.length; i++) h = ((h << 5) + h) ^ str.charCodeAt(i);
+      return (h >>> 0).toString(36);
+    } catch (_) { return String(Math.abs(str?.length || 0)); }
+  }
+  listSignature(list) {
+    try {
+      const items = Array.isArray(list) ? list : [];
+      // Include identifiers and primary fields to detect meaningful changes
+      const norm = items.map(x => [x.id, x.courseUid, x.classUid, x.courseName, x.className, x.startDate]).join('|');
+      return this.hashKey(norm);
+    } catch (_) { return 's0'; }
   }
 }

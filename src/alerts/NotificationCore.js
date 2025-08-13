@@ -1,6 +1,7 @@
 import { NotificationUtils } from './NotificationUtils.js';
 import { NotificationUI } from './NotificationUI.js';
 import { UserConfig } from '../sdk/userConfig.js';
+import { CacheTTLs } from '../utils/cacheConfig.js';
 
 const userConfig = new UserConfig();
 // Cache class IDs per user to avoid duplicate network calls across instances
@@ -16,6 +17,7 @@ export class NotificationCore {
     this.alertsModel = plugin.switchTo(modelName);
     this.query = null;
     this.subscriptions = [];
+    this.lastSig = null;
   }
 
   async fetchClassIds() {
@@ -278,7 +280,7 @@ export class NotificationCore {
       if (!raw) return null;
       const parsed = JSON.parse(raw);
       if (!parsed || typeof parsed !== 'object') return null;
-      const ttlMs = this.scope === 'nav' ? 120000 : 180000; // 2-3 min TTL
+      const ttlMs = this.scope === 'nav' ? CacheTTLs.alerts.nav() : CacheTTLs.alerts.body();
       if (!parsed.ts || (Date.now() - parsed.ts) > ttlMs) return null;
       if (parsed.uid !== userConfig.userId) return null;
       if (!Array.isArray(parsed.list)) return null;
@@ -289,7 +291,8 @@ export class NotificationCore {
     try {
       const cap = this.scope === 'nav' ? (this.limit || 5) : 100;
       const trimmed = Array.isArray(list) ? list.slice(0, cap) : [];
-      const value = JSON.stringify({ ts: Date.now(), uid: userConfig.userId, list: trimmed });
+      const sig = this.listSignature(trimmed);
+      const value = JSON.stringify({ ts: Date.now(), uid: userConfig.userId, sig, list: trimmed });
       localStorage.setItem(this.cacheKey(classIds), value);
     } catch (_) {}
   }
@@ -312,6 +315,7 @@ export class NotificationCore {
     if (!cached) return false;
     try {
       NotificationUI.renderList(cached, el);
+      this.lastSig = this.listSignature(cached);
       return true;
     } catch (_) { return false; }
   }
@@ -343,6 +347,7 @@ export class NotificationCore {
         // Apply client-side slicing only if no server-side limit was set
         const sliced = (!Number.isFinite(this.limit) || this.limit <= 0) ? raw : raw.slice(0, this.limit);
         const recs = sliced.map(NotificationUtils.mapSdkNotificationToUi);
+        const newSig = this.listSignature(recs);
         // Persist to cache for faster warm loads
         this.writeCache(recs, this.classIds);
         const debugInfo = userConfig?.debug?.notifications
@@ -360,7 +365,10 @@ export class NotificationCore {
             };
           })()
           : undefined;
-        NotificationUI.renderList(recs, el, debugInfo);
+        if (!this.lastSig || newSig !== this.lastSig) {
+          NotificationUI.renderList(recs, el, debugInfo);
+          this.lastSig = newSig;
+        }
         if (!resolved) { resolved = true; resolveFirst(); }
       },
       console.error
@@ -380,5 +388,13 @@ export class NotificationCore {
     this.unsubscribeAll();
     if (this.query && typeof this.query.destroy === 'function') this.query.destroy();
     await this.start();
+  }
+
+  listSignature(list) {
+    try {
+      const items = Array.isArray(list) ? list : [];
+      const norm = items.map(x => [x.ID, x.Is_Read ? 1 : 0, x.Alert_Type, x.Title, x.Date_Added, x.Parent_Class_ID]).join('|');
+      return this.hashKey(norm);
+    } catch (_) { return 's0'; }
   }
 }

@@ -3,23 +3,102 @@ import { VitalStatsSDK } from '../sdk/init.js';
 import { NotificationCore } from './NotificationCore.js';
 import { NotificationUI } from './NotificationUI.js';
 import { NotificationUtils } from './NotificationUtils.js';
+import { UserConfig } from '../sdk/userConfig.js';
+import { CacheTTLs } from '../utils/cacheConfig.js';
 
 const { slug, apiKey } = config;
 
 (async function main() {
   try {
+    // Try pre-render from cache BEFORE SDK init for instant paint
+    const navEl = document.getElementById('navbar-notifications-list');
+    const navLoadingEl = document.getElementById('navbar-notifications-loading');
+    if (navEl) {
+      try {
+        const u = new UserConfig();
+        const type = String(u.userType || 'unknown').toLowerCase();
+        const ttlMs = CacheTTLs.alerts.nav();
+        const prefix = `awc:alerts:v1:nav:${type}:${u.userId}:`;
+        let rendered = false;
+        const hash = (str) => { try { let h = 5381; for (let i=0;i<str.length;i++) h=((h<<5)+h)^str.charCodeAt(i); return (h>>>0).toString(36);} catch(_){ return 's0'; } };
+        const listSig = (list) => { try { return hash((list||[]).map(x => [x.ID, x.Is_Read?1:0, x.Alert_Type, x.Title, x.Date_Added, x.Parent_Class_ID]).join('|')); } catch(_){ return 's0'; } };
+        for (let i = 0; i < localStorage.length; i++) {
+          const k = localStorage.key(i);
+          if (!k || !k.startsWith(prefix)) continue;
+          try {
+            const raw = localStorage.getItem(k);
+            if (!raw) continue;
+            const parsed = JSON.parse(raw);
+            if (!parsed?.ts || (Date.now() - parsed.ts) > ttlMs) continue;
+            if (!Array.isArray(parsed.list)) continue;
+            NotificationUI.renderList(parsed.list, navEl, undefined);
+            navLoadingEl?.classList.add('hidden');
+            navEl.classList.remove('hidden');
+            rendered = true;
+            window.__awcNavAlertsPreRendered = true;
+            window.__awcNavAlertsSig = parsed.sig || listSig(parsed.list);
+            break;
+          } catch (_) {}
+        }
+        if (!rendered) {
+          // Show skeleton if no warm cache
+          navLoadingEl?.classList.add('hidden');
+          navEl.classList.remove('hidden');
+          NotificationUI.renderSkeleton(navEl, 3, 'nav');
+        }
+      } catch (_) {}
+    }
+
+    const bodyEl = document.getElementById('body-notifications-list');
+    const bodyLoadingEl = document.getElementById('body-notifications-loading');
+    if (bodyEl) {
+      try {
+        const u = new UserConfig();
+        const type = String(u.userType || 'unknown').toLowerCase();
+        const ttlMs = CacheTTLs.alerts.body();
+        const prefix = `awc:alerts:v1:body:${type}:${u.userId}:`;
+        let rendered = false;
+        const hash = (str) => { try { let h = 5381; for (let i=0;i<str.length;i++) h=((h<<5)+h)^str.charCodeAt(i); return (h>>>0).toString(36);} catch(_){ return 's0'; } };
+        const listSig = (list) => { try { return hash((list||[]).map(x => [x.ID, x.Is_Read?1:0, x.Alert_Type, x.Title, x.Date_Added, x.Parent_Class_ID]).join('|')); } catch(_){ return 's0'; } };
+        for (let i = 0; i < localStorage.length; i++) {
+          const k = localStorage.key(i);
+          if (!k || !k.startsWith(prefix)) continue;
+          try {
+            const raw = localStorage.getItem(k);
+            if (!raw) continue;
+            const parsed = JSON.parse(raw);
+            if (!parsed?.ts || (Date.now() - parsed.ts) > ttlMs) continue;
+            if (!Array.isArray(parsed.list)) continue;
+            NotificationUI.renderList(parsed.list, bodyEl, undefined);
+            bodyLoadingEl?.classList.add('hidden');
+            bodyEl.classList.remove('hidden');
+            rendered = true;
+            window.__awcBodyAlertsPreRendered = true;
+            window.__awcBodyAlertsSig = parsed.sig || listSig(parsed.list);
+            break;
+          } catch (_) {}
+        }
+        if (!rendered) {
+          // Keep existing loading state; body shows spinner until data
+          bodyLoadingEl?.classList.remove('hidden');
+          bodyEl.classList.add('hidden');
+        }
+      } catch (_) {}
+    }
+
     // Initialize SDK
     const sdk = new VitalStatsSDK({ slug, apiKey });
     const plugin = await sdk.initialize();
     window.tempPlugin ??= plugin;
 
-    const navEl = document.getElementById('navbar-notifications-list');
-    const navLoadingEl = document.getElementById('navbar-notifications-loading');
     let navReadyPromise = Promise.resolve();
     if (navEl) {
       const navCore = new NotificationCore({ plugin, limit: 50, targetElementId: 'navbar-notifications-list', scope: 'nav' });
       window.navNotificationCore = navCore;
-      const hadCache = navCore.preRenderFromCache();
+      if (window.__awcNavAlertsPreRendered) {
+        navCore.lastSig = window.__awcNavAlertsSig || null;
+      }
+      const hadCache = window.__awcNavAlertsPreRendered ? true : navCore.preRenderFromCache();
       if (hadCache) {
         navLoadingEl?.classList.add('hidden');
         navEl.classList.remove('hidden');
@@ -39,15 +118,18 @@ const { slug, apiKey } = config;
       await navReadyPromise;
     }
 
-    const bodyEl = document.getElementById('body-notifications-list');
-    const bodyLoadingEl = document.getElementById('body-notifications-loading');
+    // const bodyEl = document.getElementById('body-notifications-list');
+    // const bodyLoadingEl = document.getElementById('body-notifications-loading');
     if (bodyEl) {
       const startBody = async () => {
         bodyLoadingEl?.classList.remove('hidden');
         bodyEl.classList.add('hidden');
         const bodyCore = new NotificationCore({ plugin, limit: undefined, targetElementId: 'body-notifications-list', scope: 'body' });
         window.bodyNotificationCore = bodyCore;
-        const hadCache = bodyCore.preRenderFromCache();
+        if (window.__awcBodyAlertsPreRendered) {
+          bodyCore.lastSig = window.__awcBodyAlertsSig || null;
+        }
+        const hadCache = window.__awcBodyAlertsPreRendered ? true : bodyCore.preRenderFromCache();
         if (hadCache) {
           bodyLoadingEl?.classList.add('hidden');
           bodyEl.classList.remove('hidden');
