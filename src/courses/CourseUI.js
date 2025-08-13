@@ -1,3 +1,5 @@
+import { UserConfig } from '../sdk/userConfig.js';
+
 export class CourseUI {
   static renderNavItem(c) {
     const img = c.courseImage || '';
@@ -11,9 +13,30 @@ export class CourseUI {
   }
 
   static renderHomeItem(c) {
+    const { userType } = new UserConfig();
+    const role = String(userType || '').toLowerCase();
     const img = c.courseImage || '';
-    const name = c.courseName || '';
+    const courseName = c.courseName || '';
+    const className = c.className || courseName;
+    const start = c.startDate || '';
     const url = `https://courses.writerscentre.com.au/students/course-details/${c.courseUid}?eid=${c.classUid}`;
+
+    if (role === 'teacher' || role === 'admin') {
+      return `
+        <div class="flex flex-col items-start gap-[24px] bg-white px-4 py-[24px]" data-class-name="${className}" data-course-name="${courseName}">
+          ${start ? `<div class=\"flex items-center justify-center gap-2 rounded bg-[#ebf6f6] px-2 py-0.5\"><div class=\"serif text-smallText text-[#007b8e]\">Start Date: ${start}</div></div>` : ''}
+          <div class="flex flex-col gap-4 w-full">
+            <a href="${url}" class="serif text-h3 text-[#414042] line-clamp-1">${className}</a>
+            <div class="flex items-center gap-3 text-[#586A80]">
+              <img src="${img}" alt="${courseName}" class="w-10 h-10 rounded object-cover" />
+              <div class="text-sm line-clamp-2">${courseName}</div>
+            </div>
+            <a href="${url}" class="primaryButton w-fit">View Class</a>
+          </div>
+        </div>
+      `;
+    }
+
     return `
       <div class="bg-white p-4 flex flex-col gap-4">
         <a href="${url}">
@@ -21,7 +44,7 @@ export class CourseUI {
         </a>
         <div class="flex flex-col gap-2">
           <a href="${url}">
-            <div class="button text-[#414042]">${name}</div>
+            <div class="button text-[#414042]">${courseName}</div>
           </a>
           <div class="text-[#586A80] extra-small-text line-clamp-1">${c.subtitle || 'null'}</div>
         </div>
@@ -35,7 +58,6 @@ export class CourseUI {
         <a href="${url}">
           <div class="primaryButton w-fit text-[#ccc]">View Course</div>
         </a>
-        
       </div>
     `;
   }

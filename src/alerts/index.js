@@ -15,49 +15,47 @@ const { slug, apiKey } = config;
 
     const navEl = document.getElementById('navbar-notifications-list');
     const navLoadingEl = document.getElementById('navbar-notifications-loading');
+    let navReadyPromise = Promise.resolve();
     if (navEl) {
-      try {
-        navLoadingEl?.classList.remove('hidden');
-        navEl.classList.add('hidden');
-        const navCore = new NotificationCore({ plugin, limit: 5, targetElementId: 'navbar-notifications-list' });
-        await navCore.initialFetch();
-        navCore.subscribeToUpdates();
-        window.navNotificationCore = navCore;
-      } finally {
+      navLoadingEl?.classList.remove('hidden');
+      navEl.classList.add('hidden');
+      const navCore = new NotificationCore({ plugin, limit: 5, targetElementId: 'navbar-notifications-list' });
+      window.navNotificationCore = navCore;
+      navReadyPromise = navCore.start().then(() => {
         navLoadingEl?.classList.add('hidden');
         navEl.classList.remove('hidden');
-      }
+      }).catch(() => {
+        navLoadingEl?.classList.add('hidden');
+        navEl.classList.remove('hidden');
+      });
+      await navReadyPromise;
     }
 
     const bodyEl = document.getElementById('body-notifications-list');
     const bodyLoadingEl = document.getElementById('body-notifications-loading');
     if (bodyEl) {
       const startBody = async () => {
+        bodyLoadingEl?.classList.remove('hidden');
+        bodyEl.classList.add('hidden');
+        const bodyCore = new NotificationCore({ plugin, limit: undefined, targetElementId: 'body-notifications-list' });
+        window.bodyNotificationCore = bodyCore;
         try {
-          bodyLoadingEl?.classList.remove('hidden');
-          bodyEl.classList.add('hidden');
-          const bodyCore = new NotificationCore({ plugin, limit: 5000, targetElementId: 'body-notifications-list' });
-          try {
-            bodyCore.renderFromState();
-            if (bodyEl.innerHTML.trim()) {
-              bodyLoadingEl?.classList.add('hidden');
-              bodyEl.classList.remove('hidden');
-            }
-          } catch (_) {}
-          await bodyCore.initialFetch();
-          bodyCore.subscribeToUpdates();
-          window.bodyNotificationCore = bodyCore;
+          await bodyCore.start();
         } finally {
           bodyLoadingEl?.classList.add('hidden');
           bodyEl.classList.remove('hidden');
         }
       };
-      // Stagger heavy body load to keep navbar ultra-responsive
-      if (window.requestIdleCallback) {
-        window.requestIdleCallback(() => startBody(), { timeout: 1500 });
-      } else {
-        setTimeout(() => startBody(), 250);
-      }
+      // Start body after nav first emission + additional delay to reduce contention
+      const scheduleBody = () => {
+        const start = () => startBody();
+        if (window.requestIdleCallback) {
+          window.requestIdleCallback(start, { timeout: 2500 });
+        } else {
+          setTimeout(start, 900);
+        }
+      };
+      navReadyPromise.then(scheduleBody).catch(scheduleBody);
     }
 
     function handleCardClick(e) {
@@ -80,8 +78,7 @@ const { slug, apiKey } = config;
           .update(q => q.where('id', Number(id)).set({ is_read: true }))
           .execute(true)
           .toPromise();
-        window.navNotificationCore?.forceRefresh();
-        window.bodyNotificationCore?.forceRefresh();
+        // Subscriptions will emit and update both views automatically
       } catch (err) {
         console.error(err);
       }
@@ -95,8 +92,7 @@ const { slug, apiKey } = config;
           .update(q => q.where('is_read', false).set({ is_read: true }))
           .execute(true)
           .toPromise();
-        window.navNotificationCore?.forceRefresh();
-        window.bodyNotificationCore?.forceRefresh();
+        // Subscriptions will emit and update both views automatically
       } catch (err) {
         console.error(err);
       }

@@ -1,7 +1,9 @@
 export class CourseUtils {
   static mapSdkEnrolmentToUi(rec) {
+    // Support both enrolment-shaped and class-shaped records
+    const isClassRecord = !rec.Class && (rec.unique_id || rec.Course);
     const course = rec.Course || {};
-    const klass = rec.Class || {};
+    const klass = isClassRecord ? rec : (rec.Class || {});
     return {
       id: rec.id,
       courseName: course.course_name || '',
@@ -9,6 +11,8 @@ export class CourseUtils {
       courseUid: course.unique_id,
       classId: klass.id,
       classUid: klass.unique_id,
+      className: klass.class_name || '',
+      startDate: klass.start_date || '',
     };
   }
 }

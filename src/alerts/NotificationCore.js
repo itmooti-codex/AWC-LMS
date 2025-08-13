@@ -13,7 +13,7 @@ export class NotificationCore {
     this.targetElementId = targetElementId;
     this.limit = limit;
     this.alertsModel = plugin.switchTo(modelName);
-    this.query = this.buildQuery();
+    this.query = null;
     this.subscriptions = [];
   }
 
@@ -70,8 +70,8 @@ export class NotificationCore {
         .limit(1000)
         .offset(0)
         .noDestroy();
-      await q.fetch().pipe(window.toMainInstance(true)).toPromise();
-      const recs = q.getAllRecordsArray() || [];
+      const payload = await q.fetchDirect().toPromise();
+      const recs = Array.isArray(payload?.resp) ? payload.resp : [];
       classIds = recs.map(r => r.id).filter(Boolean);
     } else {
       // Students: enrolments -> classes
@@ -84,8 +84,8 @@ export class NotificationCore {
         .limit(1000)
         .offset(0)
         .noDestroy();
-      await q.fetch().pipe(window.toMainInstance(true)).toPromise();
-      const recs = q.getAllRecordsArray() || [];
+      const payload = await q.fetchDirect().toPromise();
+      const recs = Array.isArray(payload?.resp) ? payload.resp : [];
       classIds = recs
         .map(r => {
           const c = r.Class;
@@ -102,7 +102,30 @@ export class NotificationCore {
   }
 
   buildQuery(classIds = []) {
-    const q = this.alertsModel.query().limit(this.limit).offset(0).noDestroy();
+    const q = this.alertsModel
+      .query()
+      .select([
+        'id',
+        'alert_type',
+        'content',
+        'created_at',
+        'is_mentioned',
+        'is_read',
+        'notified_contact_id',
+        'origin_url',
+        'parent_announcement_id',
+        'parent_class_id',
+        'parent_comment_id',
+        'parent_post_id',
+        'parent_submission_id',
+        'title',
+        'unique_id',
+      ])
+      .offset(0)
+      .noDestroy();
+    if (Number.isFinite(this.limit) && this.limit > 0) {
+      q.limit(this.limit);
+    }
     const uid = userConfig.userId;
     let hasCondition = false;
     if (uid !== undefined && uid !== null) {
@@ -217,13 +240,12 @@ export class NotificationCore {
     };
     return q;
   }
-
-  async initialFetch() {
+  async start() {
     const el = document.getElementById(this.targetElementId);
     if (!el) return;
     if (userConfig.preferences.turnOffAllNotifications === 'Yes') {
-      NotificationUI.renderList([], el); // Show no notifications
-      return;
+      NotificationUI.renderList([], el);
+      return Promise.resolve();
     }
     let classIds = [];
     if (String(userConfig.userType || '').toLowerCase() !== 'admin') {
@@ -231,80 +253,21 @@ export class NotificationCore {
     }
     this.classIds = classIds;
     if (String(userConfig.userType || '').toLowerCase() !== 'admin' && (!Array.isArray(classIds) || classIds.length === 0)) {
-      // No classes → do not fetch
       NotificationUI.renderList([], el);
       return;
     }
     this.query = this.buildQuery(classIds);
-    // Render immediately from any locally-cached state before network completes
-    try { this.renderFromState(); } catch (_) { }
-    await this.query.fetch().pipe(window.toMainInstance(true)).toPromise();
-    this.renderFromState();
-  }
-
-  renderFromState() {
-    const el = document.getElementById(this.targetElementId);
-    if (!el) return;
-    const all = (this.query && typeof this.query.getAllRecordsArray === 'function')
-      ? (this.query.getAllRecordsArray() || [])
-      : [];
-    // Debug: log summary and breakdown by alert_type
-    if (userConfig?.debug?.notifications) {
-      try {
-        const counts = all.reduce((acc, r) => {
-          const t = r.alert_type || 'Unknown';
-          acc[t] = (acc[t] || 0) + 1;
-          return acc;
-        }, {});
-        // Lightweight snapshot of first few IDs
-        const sampleIds = all.slice(0, 10).map(r => r.id);
-        // eslint-disable-next-line no-console
-        console.info('[NotificationCore][Debug] Query snapshot:', {
-          lastQueryDebug: this.lastQueryDebug,
-          total: all.length,
-          byType: counts,
-          sampleIds,
-        });
-      } catch (_) { }
-    }
-    const recs = all
-      .slice(0, this.limit)
-      .map(NotificationUtils.mapSdkNotificationToUi);
-    const debugInfo = userConfig?.debug?.notifications
-      ? (() => {
-        const counts = all.reduce((acc, r) => {
-          const t = r.alert_type || 'Unknown';
-          acc[t] = (acc[t] || 0) + 1;
-          return acc;
-        }, {});
-        return {
-          total: all.length,
-          byType: counts,
-          sampleIds: all.slice(0, 10).map(r => r.id),
-          lastQueryDebug: this.lastQueryDebug,
-        };
-      })()
-      : undefined;
-    NotificationUI.renderList(recs, el, debugInfo);
-  }
-
-  subscribeToUpdates() {
-    const el = document.getElementById(this.targetElementId);
-    if (!el) return;
-    if (userConfig.userType !== 'admin' && (!Array.isArray(this.classIds) || this.classIds.length === 0)) {
-      // No classes → nothing to subscribe to
-      return;
-    }
-
-    // Clean up previous subscriptions if any
     this.unsubscribeAll();
-
-    // Query subscription: use payload directly to avoid dataset conflicts
     const serverObs = this.query.subscribe ? this.query.subscribe() : this.query.localSubscribe();
+    let resolved = false;
+    let resolveFirst;
+    const firstEmission = new Promise(res => { resolveFirst = res; });
     const serverSub = serverObs.pipe(window.toMainInstance(true)).subscribe(
       (payload) => {
         const raw = Array.isArray(payload?.records) ? payload.records : Array.isArray(payload) ? payload : [];
-        const recs = raw.map(NotificationUtils.mapSdkNotificationToUi);
+        // Apply client-side slicing only if no server-side limit was set
+        const sliced = (!Number.isFinite(this.limit) || this.limit <= 0) ? raw : raw.slice(0, this.limit);
+        const recs = sliced.map(NotificationUtils.mapSdkNotificationToUi);
         const debugInfo = userConfig?.debug?.notifications
           ? (() => {
             const counts = raw.reduce((acc, r) => {
@@ -321,12 +284,12 @@ export class NotificationCore {
           })()
           : undefined;
         NotificationUI.renderList(recs, el, debugInfo);
+        if (!resolved) { resolved = true; resolveFirst(); }
       },
       console.error
     );
-
-    // Keep only the query subscription to avoid duplicate update streams
     this.subscriptions = [serverSub];
+    return firstEmission;
   }
 
   unsubscribeAll() {
@@ -336,27 +299,9 @@ export class NotificationCore {
 
   // For manual refresh if needed
   async forceRefresh() {
+    // Rebuild and resubscribe (no fetch/get)
     this.unsubscribeAll();
-    if (this.query && typeof this.query.destroy === 'function') {
-      this.query.destroy();
-    }
-    let classIds = [];
-    if (userConfig.userType !== 'admin') {
-      classIds = await this.fetchClassIds();
-    }
-    this.classIds = classIds;
-    this.query = this.buildQuery(classIds);
-    const el = document.getElementById(this.targetElementId);
-    if (userConfig.preferences.turnOffAllNotifications === 'Yes') {
-      if (el) NotificationUI.renderList([], el);
-      return;
-    }
-    if (userConfig.userType !== 'admin' && (!Array.isArray(classIds) || classIds.length === 0)) {
-      if (el) NotificationUI.renderList([], el);
-      return;
-    }
-    await this.query.fetch().pipe(window.toMainInstance(true)).toPromise();
-    this.subscribeToUpdates();
-    this.renderFromState();
+    if (this.query && typeof this.query.destroy === 'function') this.query.destroy();
+    await this.start();
   }
 }
