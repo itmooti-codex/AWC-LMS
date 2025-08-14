@@ -41,27 +41,49 @@ export function buildAlertPayload(payload = {}) {
 }
 
 async function tryCreateViaMutation(plugin, payload) {
-  // Strategy 1: insert([...])
-  try {
-    const res = await plugin
-      .mutation()
-      .switchToId('ALERT')
-      .insert(q => q.values([payload]))
-      .execute(true)
-      .toPromise();
-    return res;
-  } catch (_) {}
-  // Strategy 2: create([...])
-  try {
-    const res = await plugin
-      .mutation()
-      .switchToId('ALERT')
+  if (!plugin || typeof plugin.mutation !== 'function') {
+    throw new Error('SDK mutation helper unavailable');
+  }
+
+  const resolveModelName = () => {
+    try {
+      if (plugin.MODEL_NAMES && plugin.MODEL_NAMES.ALERT) return plugin.MODEL_NAMES.ALERT;
+    } catch (_) {}
+    try {
+      // Try to find by common schema name
+      const models = (typeof plugin.getState === 'function') ? plugin.getState() : {};
+      for (const modelName in models) {
+        if (modelName === 'AwcAlert') return modelName;
+      }
+    } catch (_) {}
+    return 'AwcAlert';
+  };
+
+  // Prefer switchToId when available and resolvable; otherwise fallback to switchTo(schemaName)
+  const tryWith = async (useId) => {
+    const m = plugin.mutation();
+    const target = useId ? m.switchToId('ALERT') : m.switchTo(resolveModelName());
+    try {
+      // Strategy 1: insert([...])
+      const res = await target
+        .insert(q => q.values([payload]))
+        .execute(true)
+        .toPromise();
+      return res;
+    } catch (_) {}
+    // Strategy 2: create([...])
+    const res = await target
       .create(q => q.values([payload]))
       .execute(true)
       .toPromise();
     return res;
-  } catch (e) {
-    throw e;
+  };
+
+  try {
+    return await tryWith(true);
+  } catch (_) {
+    // Fall back to using schema name directly
+    return await tryWith(false);
   }
 }
 
