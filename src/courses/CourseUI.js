@@ -103,7 +103,7 @@ export class CourseUI {
       inner.appendChild(row);
       const cta = document.createElement("a");
       cta.href = url;
-      cta.className = "primaryButton w-fit";
+      cta.className = "primaryButton w-fit text-[#FFF]";
       cta.textContent = "View Class";
       inner.appendChild(cta);
       wrap.appendChild(inner);
@@ -151,7 +151,7 @@ export class CourseUI {
     const a2 = document.createElement("a");
     a2.href = url;
     const btn = document.createElement("div");
-    btn.className = "primaryButton w-fit text-[#ccc]";
+    btn.className = "primaryButton w-fit text-[#FFF]";
     btn.textContent = "View Course";
     a2.appendChild(btn);
     wrap.appendChild(a2);
