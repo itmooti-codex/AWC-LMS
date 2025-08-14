@@ -99,11 +99,11 @@ function renderPagination(totalPages) {
     btn.textContent = label;
     btn.className = 'px-3 py-1 bg-gray-200 rounded';
     if (disabled) {
-      btn.classList.add('opacity-50', 'cursor-default');
+      btn.classList.add('px-3', 'py-1', 'rounded', 'bg-gray-200');
       btn.disabled = true;
     }
     if (active) {
-      btn.classList.add('bg-blue-500', 'text-white');
+      btn.classList.add('px-3', 'py-1', 'rounded', 'bg-[#007b8e]', 'text-white');
     }
     btn.addEventListener('click', () => {
       if (!disabled && page !== currentPage) {
