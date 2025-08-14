@@ -1067,40 +1067,85 @@ $(document).ready(async function () {
               if (!clsId) return;
               console.groupCollapsed && console.groupCollapsed("[ForumAlerts] Begin alert creation for post", created?.id);
               try { console.log("[ForumAlerts] Using class ID", clsId); } catch(_) {}
-              const q = `
-                query calcClasses($id: AwcClassID) {
-                  calcClasses(query: [{ where: { id: $id } }]) {
-                    Contact_Contact_ID: field(arg: ["Enrolments", "Student", "id"])
+              // Gather roster via getClasses and calcEnrolments to avoid pagination
+              const qClasses = `
+                query getClassStudents($id: AwcClassID) {
+                  getClasses(query: [{ where: { id: $id } }]) {
+                    Enrolments { Student { id } }
                   }
                 }
               `;
-              const res = await fetch(graphqlApiEndpoint, {
-                method: "POST",
-                headers: { "Content-Type": "application/json", "Api-Key": apiAccessKey },
-                body: JSON.stringify({ query: q, variables: { id: clsId } }),
-              }).then(r => r.ok ? r.json() : Promise.reject("calcClasses query failed"));
-              try { console.log("[ForumAlerts] calcClasses raw response", res); } catch(_) {}
-              // Collect IDs from all rows and normalise types
-              const rows = Array.isArray(res?.data?.calcClasses) ? res.data.calcClasses : [];
-              let ids = [];
-              for (const row of rows) {
-                const raw = row?.Contact_Contact_ID;
-                if (raw == null) continue;
-                if (Array.isArray(raw)) {
-                  ids.push(...raw);
-                } else if (typeof raw === "string") {
-                  // Could be CSV or a single numeric string
-                  ids.push(...raw.split(","));
-                } else if (typeof raw === "number") {
-                  ids.push(raw);
-                } else {
-                  // Fallback: attempt to coerce
-                  ids.push(raw);
+              const qEnrol = `
+                query getClassEnrolmentStudents($id: AwcClassID) {
+                  calcEnrolments(query: [{ where: { class_id: $id } }]) {
+                    Student_ID: field(arg: ["Student", "id"])
+                  }
+                }
+              `;
+              const qTeacher = `
+                query calcClasses($id: AwcClassID) {
+                  calcClasses(query: [{ where: { id: $id } }]) {
+                    Teacher_Contact_ID: field(arg: ["Teacher", "id"])
+                  }
+                }
+              `;
+              const [resClasses, resEnrol, resTeacher] = await Promise.all([
+                fetch(graphqlApiEndpoint, {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json", "Api-Key": apiAccessKey },
+                  body: JSON.stringify({ query: qClasses, variables: { id: clsId } }),
+                }).then(r => r.ok ? r.json() : Promise.reject("getClasses query failed")),
+                fetch(graphqlApiEndpoint, {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json", "Api-Key": apiAccessKey },
+                  body: JSON.stringify({ query: qEnrol, variables: { id: clsId } }),
+                }).then(r => r.ok ? r.json() : Promise.reject("calcEnrolments query failed")),
+                fetch(graphqlApiEndpoint, {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json", "Api-Key": apiAccessKey },
+                  body: JSON.stringify({ query: qTeacher, variables: { id: clsId } }),
+                }).then(r => r.ok ? r.json() : Promise.reject("calcClasses query failed")),
+              ]);
+              try { console.log("[ForumAlerts] Roster responses", { resClasses, resEnrol, resTeacher }); } catch(_) {}
+              // Extract student IDs
+              let idsFromClasses = [];
+              const classes = Array.isArray(resClasses?.data?.getClasses) ? resClasses.data.getClasses : [];
+              for (const cls of classes) {
+                const enrols = Array.isArray(cls?.Enrolments) ? cls.Enrolments : [];
+                for (const enr of enrols) {
+                  const sid = enr?.Student?.id;
+                  if (sid != null) idsFromClasses.push(sid);
                 }
               }
-              ids = ids
+              let idsFromEnrol = [];
+              const enrolRows = Array.isArray(resEnrol?.data?.calcEnrolments) ? resEnrol.data.calcEnrolments : [];
+              for (const row of enrolRows) {
+                const raw = row?.Student_ID;
+                if (raw == null) continue;
+                if (Array.isArray(raw)) idsFromEnrol.push(...raw);
+                else idsFromEnrol.push(raw);
+              }
+              // Extract teacher id (could be number/string/array depending on backend)
+              let teacherIds = [];
+              try {
+                const tRaw = resTeacher?.data?.calcClasses?.[0]?.Teacher_Contact_ID;
+                if (tRaw != null) {
+                  if (Array.isArray(tRaw)) teacherIds.push(...tRaw);
+                  else teacherIds.push(tRaw);
+                }
+              } catch (_) {}
+              // Include hardcoded admin id
+              const adminIds = [10435];
+              let ids = [...idsFromClasses, ...idsFromEnrol, ...teacherIds, ...adminIds];
+              try { console.log("[ForumAlerts] Roster extracted", { fromClasses: idsFromClasses, fromEnrol: idsFromEnrol, teacherIds, adminIds }); } catch(_) {}
+              // Normalise, uniquify, and validate
+              const seen = new Set();
+              const normalize = (list) => (Array.isArray(list) ? list : [list])
                 .map(v => Number(String(v).trim()))
                 .filter(n => Number.isFinite(n) && n > 0);
+              const teacherSet = new Set(normalize(teacherIds));
+              const adminSet = new Set(normalize(adminIds));
+              ids = normalize(ids).filter(n => (seen.has(n) ? false : (seen.add(n), true)));
               try { console.log("[ForumAlerts] Student IDs parsed", { count: ids.length, ids }); } catch(_) {}
               // Exclude the author to avoid self-alert
               const authorId = Number(created.author_id || visitorContactID);
@@ -1114,11 +1159,27 @@ $(document).ready(async function () {
               const textContent = (container.textContent || "").trim();
               const content = textContent;
               const originUrl = window.location.href;
+              const buildRoleUrl = (url, role) => {
+                try {
+                  const u = new URL(url);
+                  // Attempt to swap the '/students/' segment; fallback to same URL
+                  const replaced = u.pathname.replace(/\/(students)\//, `/${role}/`);
+                  if (replaced !== u.pathname) {
+                    u.pathname = replaced;
+                    return u.toString();
+                  }
+                } catch (_) {}
+                return url;
+              };
               const createdAt = new Date().toISOString();
               const postId = Number(created.id);
               try { console.log("[ForumAlerts] Alert content prepared", { contentPreview: content.slice(0, 120), createdAt, originUrl, postId }); } catch(_) {}
               const alerts = audience.map((contactId) => {
                 const isMentioned = mentionIds.includes(Number(contactId));
+                const isTeacher = teacherSet.has(Number(contactId));
+                const isAdmin = adminSet.has(Number(contactId));
+                const teacherUrl = isTeacher ? buildRoleUrl(originUrl, 'teachers') : undefined;
+                const adminUrl = isAdmin ? buildRoleUrl(originUrl, 'admin') : undefined;
                 return {
                   alert_type: isMentioned ? "Post Mention" : "Post",
                   title: isMentioned
@@ -1130,6 +1191,8 @@ $(document).ready(async function () {
                   is_read: false,
                   notified_contact_id: Number(contactId),
                   origin_url: originUrl,
+                  origin_url_teacher: teacherUrl,
+                  origin_url_admin: adminUrl,
                   parent_post_id: postId,
                 };
               });

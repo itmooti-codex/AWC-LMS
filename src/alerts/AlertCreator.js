@@ -24,6 +24,8 @@ const ALLOWED_FIELDS = new Set([
   'is_read',
   'notified_contact_id',
   'origin_url',
+  'origin_url_teacher',
+  'origin_url_admin',
   'parent_announcement_id',
   'parent_class_id',
   'parent_comment_id',
