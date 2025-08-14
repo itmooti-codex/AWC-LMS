@@ -37,21 +37,23 @@ export class CourseUI {
   }
 
   static renderNavItem(c) {
+    const id = c.id;
     const img =
       c.courseImage ||
       "https://files.ontraport.com/media/bdd4701cb968467da95fce3f873cced4.phpcwxsax?Expires=4898813499&Signature=bvDMi4ZrbZScdIiAHOcHqU5kaiWAIFRyCCMXF80ZPc5NKcVLOQ1QndMga7Wh1wRIUuW70~lLBhIcqRErXyly6RiZtiGUAsclZa1x5KvLeuC83P-Wl8EvUblyvgPkVYYMf~u8vSYZlC4mPyHkCTkkpIUVUZTuSJ9xHilkAtXhvMOaP5-IIJiHRxTIVBqhmNu2H~J7~RPjPf3sgvgcSkczDGi6k5m8E6f3J8cHrRm7NEvb-XLk1J~zLkwf3nFDpdM4E7zTUZm3tXuyoHyqwQwe6bL9HSJx6VXUAtkQs29xaZM9xz5yujXKyiTui8UbrO8cTgW-9Rdsu2EzJxQwROYS5A__&Key-Pair-Id=APKAJVAAMVW6XQYWSTNA";
-    const name = c.courseName || "";
+    const name = c.courseName || ""; 
     return `
-      <a href="https://courses.writerscentre.com.au/students/course-details/${c.courseUid}?eid=${id}" class="flex items-center gap-2 p-2 text-sm text-neutral-600 hover:bg-[#ebf6f6] focus-visible:bg-neutral-900/10 focus-visible:text-neutral-900 focus-visible:outline-none" role="menuitem">
-        <img src="${img}" class="w-[38px] h-[30px] object-cover" />
-        <div class="text-[#586a80] h4 line-clamp-1">${name}</div>
-      </a>
+    <a href="https://courses.writerscentre.com.au/students/course-details/${c.courseUid}?eid=${id}" class="flex items-center gap-2 p-2 text-sm text-neutral-600 hover:bg-[#ebf6f6] focus-visible:bg-neutral-900/10 focus-visible:text-neutral-900 focus-visible:outline-none" role="menuitem">
+      <img src="${img}" class="w-[38px] h-[30px] object-cover" />
+      <div class="text-[#586a80] h4 line-clamp-1">${name}</div>
+    </a>
     `;
   }
 
   static renderHomeItem(c) {
     const { userType } = new UserConfig();
     const role = String(userType || "").toLowerCase();
+    const id = c.id;
     const img =
       c.courseImage ||
       "https://files.ontraport.com/media/bdd4701cb968467da95fce3f873cced4.phpcwxsax?Expires=4898813499&Signature=bvDMi4ZrbZScdIiAHOcHqU5kaiWAIFRyCCMXF80ZPc5NKcVLOQ1QndMga7Wh1wRIUuW70~lLBhIcqRErXyly6RiZtiGUAsclZa1x5KvLeuC83P-Wl8EvUblyvgPkVYYMf~u8vSYZlC4mPyHkCTkkpIUVUZTuSJ9xHilkAtXhvMOaP5-IIJiHRxTIVBqhmNu2H~J7~RPjPf3sgvgcSkczDGi6k5m8E6f3J8cHrRm7NEvb-XLk1J~zLkwf3nFDpdM4E7zTUZm3tXuyoHyqwQwe6bL9HSJx6VXUAtkQs29xaZM9xz5yujXKyiTui8UbrO8cTgW-9Rdsu2EzJxQwROYS5A__&Key-Pair-Id=APKAJVAAMVW6XQYWSTNA";
@@ -60,7 +62,7 @@ export class CourseUI {
     const description = c.description || "";
     const className = c.className || "";
     const start = c.startDate || "";
-    const url = `https://courses.writerscentre.com.au/students/course-details/${c.courseUid}?eid=${c.classUid}`;
+    const url = `https://courses.writerscentre.com.au/students/course-details/${c.courseUid}?eid=${id}`;
 
     if (role === "teacher" || role === "admin") {
       const wrap = document.createElement("div");
@@ -212,3 +214,4 @@ export class CourseUI {
     }
   }
 }
+
