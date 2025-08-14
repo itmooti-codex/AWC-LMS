@@ -43,7 +43,7 @@ export class CourseUI {
     const name = c.courseName || "";
     return `
       <a href="https://courses.writerscentre.com.au/students/course-details/${c.courseUid}?eid=${id}" class="flex items-center gap-2 p-2 text-sm text-neutral-600 hover:bg-[#ebf6f6] focus-visible:bg-neutral-900/10 focus-visible:text-neutral-900 focus-visible:outline-none" role="menuitem">
-        <img src="{img}" class="w-[38px] h-[30px] object-cover" />
+        <img src="${img}" class="w-[38px] h-[30px] object-cover" />
         <div class="text-[#586a80] h4 line-clamp-1">${name}</div>
       </a>
     `;
