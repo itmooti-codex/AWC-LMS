@@ -22,7 +22,9 @@ export class CourseCore {
 
     // Students: enrolments -> course + class
     if (type === 'student') {
-      const enrolModel = this.plugin.switchTo('EduflowproEnrolment');
+      const enrolModel = (typeof this.plugin.switchToId === 'function')
+        ? this.plugin.switchToId('ENROLMENT')
+        : this.plugin.switchTo('AwcEnrolment');
       const q = enrolModel
         .query()
         .select(['id'])
@@ -38,7 +40,9 @@ export class CourseCore {
     }
 
     // Teachers/Admins: use Classes directly -> include Course
-    const classModel = this.plugin.switchTo('EduflowproClass');
+    const classModel = (typeof this.plugin.switchToId === 'function')
+      ? this.plugin.switchToId('CLASS')
+      : this.plugin.switchTo('AwcClass');
     const q = classModel
       .query()
       .select(['id', 'unique_id', 'class_name', 'start_date'])

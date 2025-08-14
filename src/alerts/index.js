@@ -170,7 +170,7 @@ const { slug, apiKey } = config;
       try {
         await plugin
           .mutation()
-          .switchTo('EduflowproAlert')
+          .switchToId('ALERT')
           .update(q => q.where('id', Number(id)).set({ is_read: true }))
           .execute(true)
           .toPromise();
@@ -184,7 +184,7 @@ const { slug, apiKey } = config;
       try {
         await plugin
           .mutation()
-          .switchTo('EduflowproAlert')
+          .switchToId('ALERT')
           .update(q => q.where('is_read', false).set({ is_read: true }))
           .execute(true)
           .toPromise();

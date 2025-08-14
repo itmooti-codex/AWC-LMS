@@ -8,13 +8,21 @@ const userConfig = new UserConfig();
 const classIdsCache = new Map(); // key: `${userConfig.userType}:${userConfig.userId}` -> { value: number[], promise?: Promise<number[]> }
 
 export class NotificationCore {
-  constructor({ plugin, modelName = 'EduflowproAlert', limit, targetElementId, scope }) {
+  constructor({ plugin, modelName = 'AwcAlert', limit, targetElementId, scope }) {
     this.plugin = plugin;
+    // Allow passing legacy schema name or new identifier
     this.modelName = modelName;
     this.targetElementId = targetElementId;
     this.limit = limit;
     this.scope = scope || ((Number.isFinite(limit) && limit > 0 && limit <= 10) ? 'nav' : 'body');
-    this.alertsModel = plugin.switchTo(modelName);
+    // Prefer switching by identifier; fall back to schema name
+    try {
+      this.alertsModel = (typeof plugin.switchToId === 'function')
+        ? plugin.switchToId('ALERT')
+        : plugin.switchTo(modelName);
+    } catch (_) {
+      this.alertsModel = plugin.switchTo(modelName);
+    }
     this.query = null;
     this.subscriptions = [];
     this.lastSig = null;
@@ -65,7 +73,9 @@ export class NotificationCore {
     let classIds = [];
     if (userType === 'teacher') {
       // Teachers: find classes where instructor_id = user
-      const classModel = this.plugin.switchTo('EduflowproClass');
+      const classModel = (typeof this.plugin.switchToId === 'function')
+        ? this.plugin.switchToId('CLASS')
+        : this.plugin.switchTo('AwcClass');
       const q = classModel
         .query()
         .select(['id'])
@@ -78,7 +88,9 @@ export class NotificationCore {
       classIds = recs.map(r => r.id).filter(Boolean);
     } else {
       // Students: enrolments -> classes
-      const enrolmentModel = this.plugin.switchTo('EduflowproEnrolment');
+      const enrolmentModel = (typeof this.plugin.switchToId === 'function')
+        ? this.plugin.switchToId('ENROLMENT')
+        : this.plugin.switchTo('AwcEnrolment');
       const q = enrolmentModel
         .query()
         .select(['id'])
@@ -190,9 +202,7 @@ export class NotificationCore {
             .where('alert_type', 'Submission Comment')
             .andWhere('Parent_Comment', q1 =>
               q1.andWhere('Submissions', q2 =>
-                q2.andWhere('Assessment_Attempt', q3 =>
-                  q3.andWhere('Student', q4 => q4.where('student_id', Number(uid)))
-                )
+                q2.andWhere('Student', q4 => q4.where('student_id', Number(uid)))
               )
             )
         );

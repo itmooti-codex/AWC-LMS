@@ -6,6 +6,7 @@
     margin: 0 !important;
     border-radius: 4px !important;
     transition: 0.2s ease-in-out;
+    color: white !important;    
 }
 .primaryButton:hover, .primaryButton:active, .primaryButton:focus {
     background: #00505c !important;

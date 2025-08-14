@@ -45,7 +45,7 @@ async function tryCreateViaMutation(plugin, payload) {
   try {
     const res = await plugin
       .mutation()
-      .switchTo('EduflowproAlert')
+      .switchToId('ALERT')
       .insert(q => q.values([payload]))
       .execute(true)
       .toPromise();
@@ -55,7 +55,7 @@ async function tryCreateViaMutation(plugin, payload) {
   try {
     const res = await plugin
       .mutation()
-      .switchTo('EduflowproAlert')
+      .switchToId('ALERT')
       .create(q => q.values([payload]))
       .execute(true)
       .toPromise();
