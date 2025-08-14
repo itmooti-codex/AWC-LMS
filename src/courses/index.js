@@ -31,15 +31,15 @@ import { UserConfig } from '../sdk/userConfig.js';
             if (parsed?.ts && (Date.now() - parsed.ts) <= ttlMs && Array.isArray(parsed.list)) {
               (await import('./CourseUI.js')).CourseUI.renderList(parsed.list, navContainer);
               // Seed signature to avoid repaint after network if unchanged
-              const hash = (str) => { try { let h = 5381; for (let i=0;i<str.length;i++) h=((h<<5)+h)^str.charCodeAt(i); return (h>>>0).toString(36);} catch(_){ return 's0'; } };
-              const listSig = (list) => { try { return hash((list||[]).map(x => [x.id, x.courseUid, x.classUid, x.courseName, x.className, x.startDate]).join('|')); } catch(_){ return 's0'; } };
+              const hash = (str) => { try { let h = 5381; for (let i = 0; i < str.length; i++) h = ((h << 5) + h) ^ str.charCodeAt(i); return (h >>> 0).toString(36); } catch (_) { return 's0'; } };
+              const listSig = (list) => { try { return hash((list || []).map(x => [x.id, x.courseUid, x.classUid, x.courseName, x.moduleCount, x.description, x.className, x.startDate]).join('|')); } catch (_) { return 's0'; } };
               window.__awcNavCoursesPreRendered = true;
               window.__awcNavCoursesSig = parsed.sig || listSig(parsed.list);
             }
           }
         } catch (_) { /* ignore */ }
       }
-    } catch (_) {}
+    } catch (_) { }
 
     const plugin = await sdk.initialize();
     window.tempPlugin ??= plugin;

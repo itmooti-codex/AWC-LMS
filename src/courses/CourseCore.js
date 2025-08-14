@@ -31,8 +31,9 @@ export class CourseCore {
         .where('student_id', uid)
         .andWhere(query => query.where('status', 'Active').orWhere('status', 'New'))
         .andWhere('Course', query => query.whereNot('course_name', 'isNull'))
-        .include('Course', q1 => q1.deSelectAll().select(['unique_id', 'course_name', 'image']))
-        .include('Class', q1 => q1.select(['id', 'unique_id']))
+        .andWhere('Class', query => query.whereNot('class_name', 'isNull'))
+        .include('Course', q1 => q1.deSelectAll().select(['unique_id', 'course_name', 'image', 'module__count__visible', 'description']))
+        .include('Class', q1 => q1.select(['id', 'unique_id', 'class_name']))
         .limit(this.limit)
         .offset(0)
         .noDestroy();
@@ -46,15 +47,12 @@ export class CourseCore {
     const q = classModel
       .query()
       .select(['id', 'unique_id', 'class_name', 'start_date'])
-      .include('Course', q1 => q1.deSelectAll().select(['unique_id', 'course_name', 'image']))
+      .include('Course', q1 => q1.deSelectAll().select(['unique_id', 'course_name', 'image', 'module__count__visible', 'description']))
       .limit(this.limit)
       .offset(0)
       .noDestroy();
 
     // For teacher and admin: fetch all classes (no conditions)
-
-    // Optional ordering by newest
-    try { if (typeof q.orderBy === 'function') q.orderBy('created_at', 'desc'); } catch (_) {}
     return q;
   }
 
@@ -70,7 +68,7 @@ export class CourseCore {
         // Try to keep UI responsive: if cache exists, show it immediately
         const cached = this.readCache();
         if (Array.isArray(cached) && cached.length) {
-          try { CourseUI.renderList(cached, container, this.scope === 'home' ? 'home' : undefined); } catch (_) {}
+          try { CourseUI.renderList(cached, container, this.scope === 'home' ? 'home' : undefined); } catch (_) { }
           container.classList.remove('hidden');
           loadingEl?.classList.add('hidden');
           this.lastSig = this.listSignature(cached);
@@ -79,9 +77,12 @@ export class CourseCore {
           container.classList.add('hidden');
         }
       }
-      await this.query.fetch().pipe(window.toMainInstance(true)).toPromise();
-      const rawRecords = this.query.getAllRecordsArray() || [];
-      const recs = rawRecords.map(CourseUtils.mapSdkEnrolmentToUi);
+      // Use fetchDirect to preserve server-side ordering in the returned payload
+      const payload = await this.query.fetchDirect().toPromise();
+      const rawRecords = Array.isArray(payload?.resp) ? payload.resp : [];
+      let recs = rawRecords.map(CourseUtils.mapSdkEnrolmentToUi);
+      // Client-side sort by course name ascending
+      try { recs.sort((a, b) => String(a.courseName || '').localeCompare(String(b.courseName || ''), undefined, { sensitivity: 'base' })); } catch (_) {}
       // Persist fresh list for warm reloads
       this.writeCache(recs);
       const newSig = this.listSignature(recs);
@@ -142,7 +143,7 @@ export class CourseCore {
     try {
       const items = Array.isArray(list) ? list : [];
       // Include identifiers and primary fields to detect meaningful changes
-      const norm = items.map(x => [x.id, x.courseUid, x.classUid, x.courseName, x.className, x.startDate]).join('|');
+      const norm = items.map(x => [x.id, x.courseUid, x.classUid, x.courseName, x.moduleCount, x.description, x.className, x.startDate]).join('|');
       return this.hashKey(norm);
     } catch (_) { return 's0'; }
   }

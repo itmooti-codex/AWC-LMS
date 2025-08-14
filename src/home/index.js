@@ -152,9 +152,11 @@ function applySearch(term) {
     const sdk = new VitalStatsSDK({ slug, apiKey });
     const plugin = window.tempPlugin || await sdk.initialize();
     const core = new CourseCore({ plugin, targetElementId: 'courses-list', limit: 5000 });
-    await core.query.fetch().pipe(window.toMainInstance(true)).toPromise();
-    const rawRecords = core.query.getAllRecordsArray() || [];
+    const payload = await core.query.fetchDirect().toPromise();
+    const rawRecords = Array.isArray(payload?.resp) ? payload.resp : [];
     allCourses = rawRecords.map(CourseUtils.mapSdkEnrolmentToUi);
+    // Client-side sort by course name ascending
+    try { allCourses.sort((a, b) => String(a.courseName || '').localeCompare(String(b.courseName || ''), undefined, { sensitivity: 'base' })); } catch (_) {}
     filteredCourses = allCourses;
     const newSig = listSignature(allCourses);
     // Persist to cache for warm reloads
