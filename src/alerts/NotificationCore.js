@@ -155,23 +155,8 @@ export class NotificationCore {
       q.limit(this.limit);
     }
     const uid = userConfig.userId;
-    let hasCondition = false;
     if (uid !== undefined && uid !== null) {
       q.where('notified_contact_id', Number(uid));
-      hasCondition = true;
-    }
-    // For non-admin users, always constrain by class IDs. If none, return no records.
-    if (String(userConfig.userType || '').toLowerCase() !== 'admin') {
-      const ids = Array.isArray(classIds) ? classIds : [];
-      if (ids.length === 0) {
-        // No classes → no alerts
-        q.limit(0);
-      } else {
-        const args = ['parent_class_id', 'in', ids];
-        if (hasCondition) q.andWhere(...args);
-        else q.where(...args);
-        hasCondition = true;
-      }
     }
 
     // Apply user preference conditions for alert types, mentions, and ownership checks
@@ -260,7 +245,7 @@ export class NotificationCore {
     // Expose debug snapshot for later logging
     this.lastQueryDebug = {
       userId: uid,
-      classIds: Array.isArray(classIds) ? classIds.slice() : [],
+      classIds: [],
       preferences: { ...(userConfig.preferences || {}) },
       addedAnyBranch,
     };
@@ -349,16 +334,8 @@ export class NotificationCore {
       NotificationUI.renderList([], el);
       return Promise.resolve();
     }
-    let classIds = [];
-    if (String(userConfig.userType || '').toLowerCase() !== 'admin') {
-      classIds = await this.fetchClassIds();
-    }
-    this.classIds = classIds;
-    if (String(userConfig.userType || '').toLowerCase() !== 'admin' && (!Array.isArray(classIds) || classIds.length === 0)) {
-      NotificationUI.renderList([], el);
-      return;
-    }
-    this.query = this.buildQuery(classIds);
+    this.classIds = [];
+    this.query = this.buildQuery([]);
     this.unsubscribeAll();
     const serverObs = this.query.subscribe ? this.query.subscribe() : this.query.localSubscribe();
     let resolved = false;
