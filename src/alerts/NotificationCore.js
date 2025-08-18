@@ -204,25 +204,56 @@ export class NotificationCore {
         addBranch(sub => sub.where('alert_type', 'Announcement Mention').andWhere('is_mentioned', true));
       }
 
-      // Comment types (all comments regardless of authorship)
-      if (yes(p.postComments)) addBranch(sub => sub.where('alert_type', 'Post Comment'));
-      if (yes(p.submissionComments)) addBranch(sub => sub.where('alert_type', 'Submission Comment'));
-      if (yes(p.announcementComments)) addBranch(sub => sub.where('alert_type', 'Announcement Comment'));
+      // Comment types (all comments regardless of authorship). Base includes mentions.
+      if (yes(p.postComments)) {
+        addBranch(sub => sub.where(qx => {
+          if (typeof qx.whereIn === 'function') return qx.whereIn('alert_type', ['Post Comment', 'Post Comment Mention']);
+          qx.where('alert_type', 'Post Comment').orWhere('alert_type', 'Post Comment Mention');
+        }));
+      } else if (yes(p.postCommentMentions)) {
+        addBranch(sub => sub.where('alert_type', 'Post Comment Mention').andWhere('is_mentioned', true));
+      }
+
+      if (yes(p.submissionComments)) {
+        addBranch(sub => sub.where(qx => {
+          if (typeof qx.whereIn === 'function') return qx.whereIn('alert_type', ['Submission Comment', 'Submission Comment Mention']);
+          qx.where('alert_type', 'Submission Comment').orWhere('alert_type', 'Submission Comment Mention');
+        }));
+      } else if (yes(p.submissionCommentMentions)) {
+        addBranch(sub => sub.where('alert_type', 'Submission Comment Mention').andWhere('is_mentioned', true));
+      }
+
+      if (yes(p.announcementComments)) {
+        addBranch(sub => sub.where(qx => {
+          if (typeof qx.whereIn === 'function') return qx.whereIn('alert_type', ['Announcement Comment', 'Announcement Comment Mention']);
+          qx.where('alert_type', 'Announcement Comment').orWhere('alert_type', 'Announcement Comment Mention');
+        }));
+      } else if (yes(p.announcementCommentMentions)) {
+        addBranch(sub => sub.where('alert_type', 'Announcement Comment Mention').andWhere('is_mentioned', true));
+      }
 
       // Comments on my entities (authorship checks)
-      if (yes(p.commentsOnMyPosts)) {
+      if (!yes(p.postComments) && yes(p.commentsOnMyPosts)) {
+        // Only my post comments (include mentions)
         addBranch(sub =>
           sub
-            .where('alert_type', 'Post Comment')
+            .where(qx => {
+              if (typeof qx.whereIn === 'function') return qx.whereIn('alert_type', ['Post Comment', 'Post Comment Mention']);
+              qx.where('alert_type', 'Post Comment').orWhere('alert_type', 'Post Comment Mention');
+            })
             .andWhere('Parent_Comment', q1 =>
               q1.andWhere('Forum_Post', q2 => q2.where('author_id', Number(uid)))
             )
         );
       }
-      if (yes(p.commentsOnMySubmissions)) {
+      if (!yes(p.submissionComments) && yes(p.commentsOnMySubmissions)) {
+        // Only my submission comments (include mentions)
         addBranch(sub =>
           sub
-            .where('alert_type', 'Submission Comment')
+            .where(qx => {
+              if (typeof qx.whereIn === 'function') return qx.whereIn('alert_type', ['Submission Comment', 'Submission Comment Mention']);
+              qx.where('alert_type', 'Submission Comment').orWhere('alert_type', 'Submission Comment Mention');
+            })
             .andWhere('Parent_Comment', q1 =>
               q1.andWhere('Submissions', q2 =>
                 q2.andWhere('Student', q4 => q4.where('student_id', Number(uid)))
@@ -230,20 +261,21 @@ export class NotificationCore {
             )
         );
       }
-      if (yes(p.commentsOnMyAnnouncements)) {
+      if (!yes(p.announcementComments) && yes(p.commentsOnMyAnnouncements)) {
+        // Only my announcement comments (include mentions)
         addBranch(sub =>
           sub
-            .where('alert_type', 'Announcement Comment')
+            .where(qx => {
+              if (typeof qx.whereIn === 'function') return qx.whereIn('alert_type', ['Announcement Comment', 'Announcement Comment Mention']);
+              qx.where('alert_type', 'Announcement Comment').orWhere('alert_type', 'Announcement Comment Mention');
+            })
             .andWhere('Parent_Comment', q1 =>
               q1.andWhere('Announcements', q2 => q2.where('instructor_id', Number(uid)))
             )
         );
       }
 
-      // Comment Mentions (require is_mentioned = true)
-      if (yes(p.postCommentMentions)) addBranch(sub => sub.where('alert_type', 'Post Comment Mention').andWhere('is_mentioned', true));
-      if (yes(p.announcementCommentMentions)) addBranch(sub => sub.where('alert_type', 'Announcement Comment Mention').andWhere('is_mentioned', true));
-      if (yes(p.submissionCommentMentions)) addBranch(sub => sub.where('alert_type', 'Submission Comment Mention').andWhere('is_mentioned', true));
+      // Comment mentions are handled above with base categories; mention-only handled when base is off
     };
     q.andWhere(addGroup);
     if (!addedAnyBranch) {
