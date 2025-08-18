@@ -134,3 +134,118 @@ window.AWC ??= {};
 window.AWC.createAlert = createAlert;
 window.AWC.createAlerts = createAlerts;
 window.AWC.buildAlertPayload = buildAlertPayload;
+
+// Canonical alert URL builder
+// role: 'admin' | 'teachers' | 'students'
+// category: 'post' | 'announcement' | 'submission'
+// params: { classId, classUid, className, courseUid, eid, postId, commentId, parentPostId, announcementId, lessonUid, assessmentType, subUID, commentScrollID, notType }
+function buildAlertUrl(role, category, params = {}) {
+  const BASE = 'https://courses.writerscentre.com.au';
+  const r = String(role || '').toLowerCase();
+  const c = String(category || '').toLowerCase();
+  const p = params || {};
+
+  const classId = p.classId;
+  const classUid = p.classUid;
+  const className = p.className;
+  const courseUid = p.courseUid;
+  const eid = p.eid;
+  const postId = p.postId;
+  const commentId = p.commentId;
+  const parentPostId = p.parentPostId;
+  const announcementId = p.announcementId;
+  const lessonUid = p.lessonUid || p.lessonUIDFromPage;
+  const assessmentType = p.assessmentType || p.assessmentTypeFromPage;
+  const subUID = p.subUID;
+  const commentScrollID = p.commentScrollID;
+  const notType = p.notType;
+
+  const idForPost = (commentId || parentPostId || postId || '');
+  const idForAnnouncement = (announcementId || commentId || '');
+  // For submissions: base event -> submissionId; comment -> commentId
+  const submissionId = p.submissionId;
+  const idForSubmission = (p.isComment ? (commentId || '') : (submissionId || commentId || ''));
+
+  // Admin/Teacher routes
+  if (r === 'admin' || r === 'teachers' || r === 'teacher') {
+    const roleSeg = (r === 'admin') ? 'admin' : 'teachers';
+    if (c === 'post') {
+      return `${BASE}/${roleSeg}/class/${classId}?selectedTab=chats?current-post-id=${idForPost}`;
+    }
+    if (c === 'announcement') {
+      return `${BASE}/${roleSeg}/class/${classId}?selectedTab=announcements?data-announcement-template-id=${idForAnnouncement}`;
+    }
+    if (c === 'submission') {
+      const base = new URL(`${BASE}/course-details/content/${encodeURIComponent(lessonUid || '')}`);
+      const params = new URLSearchParams();
+      params.set('submissionPostIs', String(idForSubmission || ''));
+      if (assessmentType === 'File Submission') {
+        if (subUID) params.set('subUID', String(subUID));
+        if (commentScrollID) params.set('commentScrollId', String(commentScrollID));
+      }
+      if (classId != null) params.set('classIdFromUrl', String(classId));
+      if (className) params.set('className', String(className));
+      if (classUid) params.set('classUid', String(classUid));
+      if (classId != null) params.set('currentClassID', String(classId));
+      if (className) params.set('currentClassName', String(className));
+      if (classUid) params.set('currentClassName', String(className));
+      return `${base.toString()}?${params.toString()}`;
+    }
+  }
+
+  // Student routes
+  if (r === 'students' || r === 'student') {
+    if (c === 'post') {
+      const base = `${BASE}/students/course-details/${encodeURIComponent(courseUid || '')}`;
+      const qs = new URLSearchParams();
+      if (eid) qs.set('eid', String(eid));
+      qs.set('selectedTab', 'courseChat');
+      qs.set('current-post-id', String(idForPost || ''));
+      if (classId != null) qs.set('classIdFromUrl', String(classId));
+      if (className) qs.set('className', String(className));
+      if (classUid) qs.set('classUid', String(classUid));
+      if (classId != null) qs.set('currentClassID', String(classId));
+      if (className) qs.set('currentClassName', String(className));
+      if (classUid) qs.set('currentClassUniqueID', String(classUid));
+      return `${base}?${qs.toString()}`;
+    }
+    if (c === 'announcement') {
+      // Note: README uses 'anouncemnt' (typo) in selectedTab; preserve as-is
+      const base = `${BASE}/students/course-details/${encodeURIComponent(courseUid || '')}`;
+      const qs = new URLSearchParams();
+      if (eid) qs.set('eid', String(eid));
+      qs.set('selectedTab', 'anouncemnt');
+      // README chains another '?' before parameter; we build as proper query
+      qs.set('data-announcement-template-id', String(idForAnnouncement || ''));
+      if (classId != null) qs.set('classIdFromUrl', String(classId));
+      if (className) qs.set('className', String(className));
+      if (classUid) qs.set('classUid', String(classUid));
+      if (classId != null) qs.set('currentClassID', String(classId));
+      if (className) qs.set('currentClassName', String(className));
+      if (classUid) qs.set('currentClassUniqueID', String(classUid));
+      return `${base}?${qs.toString()}`;
+    }
+    if (c === 'submission') {
+      const base = `${BASE}/course-details/content/${encodeURIComponent(lessonUid || '')}`;
+      const qs = new URLSearchParams();
+      if (eid) qs.set('eid', String(eid));
+      if (classId != null) qs.set('classIdFromUrl', String(classId));
+      if (className) qs.set('className', String(className));
+      if (classUid) qs.set('classUid', String(classUid));
+      if (classId != null) qs.set('currentClassID', String(classId));
+      if (className) qs.set('currentClassName', String(className));
+      if (classUid) qs.set('currentClassUniqueID', String(classUid));
+      qs.set('submissionPostIs', String(idForSubmission || ''));
+      if (assessmentType === 'File Submission') {
+        if (subUID) qs.set('subUID', String(subUID));
+        if (commentScrollID) qs.set('commentScrollId', String(commentScrollID));
+      }
+      if (notType) qs.set('notType', String(notType));
+      return `${base}?${qs.toString()}`;
+    }
+  }
+  // Fallback: current location (normalized) if we cannot build
+  try { const u = new URL(window.location.href); u.search=''; u.hash=''; return u.toString(); } catch(_) { return window.location.href; }
+}
+
+window.AWC.buildAlertUrl = buildAlertUrl;
