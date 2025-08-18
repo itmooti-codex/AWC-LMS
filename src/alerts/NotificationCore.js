@@ -174,10 +174,35 @@ export class NotificationCore {
         }
       };
 
-      // Base types
-      if (yes(p.posts)) addBranch(sub => sub.where('alert_type', 'Post'));
-      if (yes(p.submissions)) addBranch(sub => sub.where('alert_type', 'Submission'));
-      if (yes(p.announcements)) addBranch(sub => sub.where('alert_type', 'Announcement'));
+      // Base types: include mentions implicitly when base is on
+      if (yes(p.posts)) {
+        addBranch(sub => sub.where(qx => {
+          // alert_type in ('Post','Post Mention')
+          if (typeof qx.whereIn === 'function') return qx.whereIn('alert_type', ['Post', 'Post Mention']);
+          qx.where('alert_type', 'Post').orWhere('alert_type', 'Post Mention');
+        }));
+      } else if (yes(p.postMentions)) {
+        // Only mentions when base is off
+        addBranch(sub => sub.where('alert_type', 'Post Mention').andWhere('is_mentioned', true));
+      }
+
+      if (yes(p.submissions)) {
+        addBranch(sub => sub.where(qx => {
+          if (typeof qx.whereIn === 'function') return qx.whereIn('alert_type', ['Submission', 'Submission Mention']);
+          qx.where('alert_type', 'Submission').orWhere('alert_type', 'Submission Mention');
+        }));
+      } else if (yes(p.submissionMentions)) {
+        addBranch(sub => sub.where('alert_type', 'Submission Mention').andWhere('is_mentioned', true));
+      }
+
+      if (yes(p.announcements)) {
+        addBranch(sub => sub.where(qx => {
+          if (typeof qx.whereIn === 'function') return qx.whereIn('alert_type', ['Announcement', 'Announcement Mention']);
+          qx.where('alert_type', 'Announcement').orWhere('alert_type', 'Announcement Mention');
+        }));
+      } else if (yes(p.announcementMentions)) {
+        addBranch(sub => sub.where('alert_type', 'Announcement Mention').andWhere('is_mentioned', true));
+      }
 
       // Comment types (all comments regardless of authorship)
       if (yes(p.postComments)) addBranch(sub => sub.where('alert_type', 'Post Comment'));
@@ -215,12 +240,9 @@ export class NotificationCore {
         );
       }
 
-      // Mentions (require is_mentioned = true)
-      if (yes(p.postMentions)) addBranch(sub => sub.where('alert_type', 'Post Mention').andWhere('is_mentioned', true));
+      // Comment Mentions (require is_mentioned = true)
       if (yes(p.postCommentMentions)) addBranch(sub => sub.where('alert_type', 'Post Comment Mention').andWhere('is_mentioned', true));
-      if (yes(p.announcementMentions)) addBranch(sub => sub.where('alert_type', 'Announcement Mention').andWhere('is_mentioned', true));
       if (yes(p.announcementCommentMentions)) addBranch(sub => sub.where('alert_type', 'Announcement Comment Mention').andWhere('is_mentioned', true));
-      if (yes(p.submissionMentions)) addBranch(sub => sub.where('alert_type', 'Submission Mention').andWhere('is_mentioned', true));
       if (yes(p.submissionCommentMentions)) addBranch(sub => sub.where('alert_type', 'Submission Comment Mention').andWhere('is_mentioned', true));
     };
     q.andWhere(addGroup);
