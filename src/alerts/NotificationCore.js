@@ -246,7 +246,9 @@ export class NotificationCore {
               if (typeof q2.orWhere === 'function') {
                 q2
                   .where('Parent_Comment', q3 => q3.andWhere('Forum_Post', q4 => q4.where('author_id', Number(uid))))
-                  .orWhere('Parent_Comment', q3 => q3.where('author_id', Number(uid)));
+                  .orWhere('Parent_Comment', q3 => q3.where('author_id', Number(uid)))
+                  // One more level deep: reply-to-reply to my comment
+                  .orWhere('Parent_Comment', q3 => q3.andWhere('Parent_Comment', q4 => q4.where('author_id', Number(uid))));
               } else {
                 q2.where('Parent_Comment', q3 => q3.andWhere('Forum_Post', q4 => q4.where('author_id', Number(uid))));
               }
@@ -269,7 +271,8 @@ export class NotificationCore {
                       q4.andWhere('Student', q5 => q5.where('student_id', Number(uid)))
                     )
                   )
-                  .orWhere('Parent_Comment', q3 => q3.where('author_id', Number(uid)));
+                  .orWhere('Parent_Comment', q3 => q3.where('author_id', Number(uid)))
+                  .orWhere('Parent_Comment', q3 => q3.andWhere('Parent_Comment', q4 => q4.where('author_id', Number(uid))));
               } else {
                 q2.where('Parent_Comment', q3 =>
                   q3.andWhere('Submissions', q4 =>
@@ -292,7 +295,8 @@ export class NotificationCore {
               if (typeof q2.orWhere === 'function') {
                 q2
                   .where('Parent_Comment', q3 => q3.andWhere('Announcements', q4 => q4.where('instructor_id', Number(uid))))
-                  .orWhere('Parent_Comment', q3 => q3.where('author_id', Number(uid)));
+                  .orWhere('Parent_Comment', q3 => q3.where('author_id', Number(uid)))
+                  .orWhere('Parent_Comment', q3 => q3.andWhere('Parent_Comment', q4 => q4.where('author_id', Number(uid))));
               } else {
                 q2.where('Parent_Comment', q3 => q3.andWhere('Announcements', q4 => q4.where('instructor_id', Number(uid))));
               }
