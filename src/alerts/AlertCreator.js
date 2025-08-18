@@ -170,10 +170,12 @@ function buildAlertUrl(role, category, params = {}) {
   if (r === 'admin' || r === 'teachers' || r === 'teacher') {
     const roleSeg = (r === 'admin') ? 'admin' : 'teachers';
     if (c === 'post') {
-      return `${BASE}/${roleSeg}/class/${classId}?selectedTab=chats?current-post-id=${idForPost}`;
+      // Use courseUid in path for admin/teacher views
+      return `${BASE}/${roleSeg}/class/${encodeURIComponent(courseUid || '')}?selectedTab=chats?current-post-id=${idForPost}`;
     }
     if (c === 'announcement') {
-      return `${BASE}/${roleSeg}/class/${classId}?selectedTab=announcements?data-announcement-template-id=${idForAnnouncement}`;
+      // Use courseUid in path for admin/teacher views
+      return `${BASE}/${roleSeg}/class/${encodeURIComponent(courseUid || '')}?selectedTab=announcements?data-announcement-template-id=${idForAnnouncement}`;
     }
     if (c === 'submission') {
       const base = new URL(`${BASE}/course-details/content/${encodeURIComponent(lessonUid || '')}`);
