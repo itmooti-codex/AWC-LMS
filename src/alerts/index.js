@@ -154,6 +154,16 @@ const { slug, apiKey } = config;
       navReadyPromise.then(scheduleBody).catch(scheduleBody);
     }
 
+    function setCardReadStyles(card) {
+      if (!card) return;
+      card.classList.remove('unread');
+      const inner = card.querySelector('div.p-2.items-start');
+      if (inner) {
+        inner.style.background = '';
+        inner.classList.add('bg-white');
+      }
+    }
+
     function handleCardClick(e) {
       const card = e.target.closest('.notification-card');
       if (!card) return;
@@ -161,19 +171,22 @@ const { slug, apiKey } = config;
       const url = card.dataset.url;
       if (!id) return;
       markAsRead(id).finally(() => {
-        card.classList.remove('unread');
+        setCardReadStyles(card);
+        updateUnreadDot();
       });
       if (url) window.open(url, '_blank');
     }
 
     async function markAsRead(id) {
       try {
-        await plugin
-          .mutation()
-          .switchToId('ALERT')
-          .update(q => q.where('id', Number(id)).set({ is_read: true }))
-          .execute(true)
-          .toPromise();
+        const run = async (useId) => {
+          const mut = plugin.mutation();
+          const target = useId ? mut.switchToId('ALERT') : mut.switchTo('AwcAlert');
+          return target.update(q => q.where('id', Number(id)).set({ is_read: true }))
+            .execute(true)
+            .toPromise();
+        };
+        try { await run(true); } catch (_) { await run(false); }
         // Subscriptions will emit and update both views automatically
       } catch (err) {
         console.error(err);
@@ -182,16 +195,21 @@ const { slug, apiKey } = config;
 
     async function markAllAsRead() {
       try {
-        await plugin
-          .mutation()
-          .switchToId('ALERT')
-          .update(q => q.where('is_read', false).set({ is_read: true }))
-          .execute(true)
-          .toPromise();
+        const run = async (useId) => {
+          const mut = plugin.mutation();
+          const target = useId ? mut.switchToId('ALERT') : mut.switchTo('AwcAlert');
+          return target.update(q => q.where('is_read', false).set({ is_read: true }))
+            .execute(true)
+            .toPromise();
+        };
+        try { await run(true); } catch (_) { await run(false); }
         // Subscriptions will emit and update both views automatically
       } catch (err) {
         console.error(err);
       }
+      // Optimistically update DOM
+      document.querySelectorAll('.notification-card.unread').forEach(c => setCardReadStyles(c));
+      updateUnreadDot();
     }
 
     navEl?.addEventListener('click', handleCardClick);
@@ -310,6 +328,34 @@ const { slug, apiKey } = config;
       bodyUnreadToggle.addEventListener('change', applyFiltersToBody);
       bindSwitchMotion(bodyUnreadToggle);
     }
+
+    // Unread red dot on bell icon
+    function updateUnreadDot() {
+      try {
+        const btn = document.getElementById('toggle-notifications');
+        if (!btn) return;
+        let dot = document.getElementById('navbar-unread-dot');
+        if (!dot) {
+          dot = document.createElement('span');
+          dot.id = 'navbar-unread-dot';
+          dot.style.position = 'absolute';
+          dot.style.top = '6px';
+          dot.style.right = '6px';
+          dot.style.width = '8px';
+          dot.style.height = '8px';
+          dot.style.borderRadius = '9999px';
+          dot.style.background = '#DC2626';
+          dot.style.display = 'none';
+          btn.parentElement?.appendChild(dot);
+        }
+        const anyUnread = !!document.querySelector('#navbar-notifications-list .notification-card.unread');
+        dot.style.display = anyUnread ? 'inline-block' : 'none';
+      } catch (_) {}
+    }
+    // Update dot when lists change
+    const unreadObserver = new MutationObserver(() => updateUnreadDot());
+    if (navEl) unreadObserver.observe(navEl, { childList: true, subtree: true });
+    updateUnreadDot();
 
     // Expose utils
     window.NotificationUI = NotificationUI;
