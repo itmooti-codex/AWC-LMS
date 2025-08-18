@@ -10,6 +10,34 @@ const { slug, apiKey } = config;
 
 (async function main() {
   try {
+    // Global debug banner renderer (visible even before data resolves)
+    window.__awcRenderAlertsDebug = function renderAlertsDebug(info) {
+      try {
+        const id = 'awc-debug-alerts-banner';
+        let el = document.getElementById(id);
+        if (!el) {
+          el = document.createElement('div');
+          el.id = id;
+          el.style.position = 'fixed';
+          el.style.right = '10px';
+          el.style.bottom = '10px';
+          el.style.zIndex = '99999';
+          el.style.maxWidth = '380px';
+          el.style.background = '#fff7ed';
+          el.style.border = '1px solid #fed7aa';
+          el.style.borderRadius = '8px';
+          el.style.padding = '10px';
+          el.style.boxShadow = '0 4px 12px rgba(0,0,0,0.08)';
+          document.body.appendChild(el);
+        }
+        const prefs = (info && info.preferences) ? info.preferences : (window.__awcLastPrefs || {});
+        const userId = info?.userId ?? (window.userIdForSDK || '');
+        const items = Object.keys(prefs || {}).map(k => `${k}=${prefs[k]}`).join(', ');
+        el.innerHTML = `<div style="font-weight:600;color:#9a3412;margin-bottom:6px;">Alerts Debug</div>
+          <div style="font-size:12px;color:#7c2d12;">User: ${userId}</div>
+          <div style="font-size:12px;color:#7c2d12;white-space:normal;word-break:break-word;">Prefs: ${items}</div>`;
+      } catch(_) {}
+    };
     // Try pre-render from cache BEFORE SDK init for instant paint
     const navEl = document.getElementById('navbar-notifications-list');
     const navLoadingEl = document.getElementById('navbar-notifications-loading');
