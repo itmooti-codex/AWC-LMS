@@ -1,7 +1,7 @@
 export class UserConfig {
   constructor() {
     this.userId = window.loggedinuserid ??= userIdForSDK;
-    this.userType = window.loggedinuserType ??= userTypeForSDL;
+    this.userType = window.loggedinuserType ??= userTypeForSDK;
     this.debug = {
       notifications: debug_Notifications,
     };
