@@ -1,5 +1,7 @@
 export class NotificationUtils {
   static mapSdkNotificationToUi(r) {
+    const parentClass = r.Parent_Class || r.parent_class || r.Class || r.class || null;
+    const course = parentClass?.Course || parentClass?.course || null;
     return {
       Alert_Type: r.alert_type,
       Content: r.content,
@@ -16,6 +18,8 @@ export class NotificationUtils {
       Parent_Submission_ID: r.parent_submission_id,
       Title: r.title,
       Unique_ID: r.unique_id,
+      Class_Name: parentClass?.class_name || '',
+      Course_Name: course?.course_name || '',
     };
   }
 

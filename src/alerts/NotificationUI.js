@@ -36,15 +36,22 @@ export class NotificationUI {
   }
   static renderNotificationCard(n) {
     const time = NotificationUtils.timeAgo(n.Date_Added * 1000);
+    const isUnread = !n.Is_Read;
+    const bgStyle = isUnread ? 'style="background:#FFEAA7;"' : '';
+    const courseName = n.Course_Name || '';
+    const className = n.Class_Name || '';
     return `
       <div class="notification-card cursor-pointer${n.Is_Read ? '' : ' unread'}" data-id="${n.ID}" data-url="${n.Origin_URL}" data-type="${n.Alert_Type || ''}">
-        <div class="p-2 items-start gap-2 rounded justify-between w-full flex ${n.Is_Read ? 'bg-white' : 'bg-yellow-50'}">
-          <div class="flex flex-col gap-1">
-            <div class="text-[#414042] text-xs font-semibold">${n.Title || ''}</div>
+        <div class="p-2 items-start gap-2 rounded justify-between w-full flex ${n.Is_Read ? 'bg-white' : ''}" ${bgStyle}>
+          <div class="flex flex-col gap-1 w-full">
+            <div class="flex items-center justify-between w-full">
+              <div class="text-[#111827] text-[12px] font-medium truncate">${courseName}</div>
+              <div class="text-[12px] text-[#586A80] whitespace-nowrap ml-2">${time}</div>
+            </div>
+            <div class="text-[#414042] text-sm font-semibold">${n.Title || ''}</div>
+            <div class="text-[#586A80] text-[12px]">${className}</div>
             <div class="text-[13px] leading-5 text-[#111827] line-clamp-2">${n.Content || ''}</div>
-            ${n.Parent_Class_ID ? `<div class="text-[#586A80] text-[12px]">Class ID: ${n.Parent_Class_ID}</div>` : ''}
           </div>
-          <div class="text-[12px] text-[#586A80] whitespace-nowrap">${time}</div>
         </div>
       </div>
     `;

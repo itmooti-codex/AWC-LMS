@@ -135,9 +135,22 @@ export class NotificationCore {
         'parent_submission_id',
         'title',
         'unique_id',
-      ])
-      .offset(0)
-      .noDestroy();
+      ]);
+    // Try to include related Class and Course for names (best-effort)
+    try {
+      if (typeof q.include === 'function') {
+        q
+          .include('Parent_Class', q1 => {
+            if (typeof q1.select === 'function') q1.select(['id', 'class_name']);
+            try {
+              if (typeof q1.include === 'function') {
+                q1.include('Course', q2 => { if (typeof q2.select === 'function') q2.select(['course_name']); });
+              }
+            } catch (_) {}
+          });
+      }
+    } catch (_) {}
+    q.offset(0).noDestroy();
     if (Number.isFinite(this.limit) && this.limit > 0) {
       q.limit(this.limit);
     }
