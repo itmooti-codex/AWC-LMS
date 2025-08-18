@@ -46,7 +46,7 @@ export class CourseCore {
       : this.plugin.switchTo('AwcClass');
     const q = classModel
       .query()
-      .select(['id', 'unique_id', 'class_name', 'start_date'])
+      .select(['id', 'unique_id', 'class_name', 'start_date', 'Student_Enrolements'])
       .include('Course', q1 => q1.deSelectAll().select(['unique_id', 'course_name', 'image', 'module__count__visible', 'description']))
       .limit(this.limit)
       .offset(0)

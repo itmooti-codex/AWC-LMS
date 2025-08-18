@@ -4,6 +4,7 @@ export class CourseUtils {
     const isClassRecord = !rec.Class && (rec.unique_id || rec.Course);
     const course = rec.Course || {};
     const klass = isClassRecord ? rec : (rec.Class || {});
+    const studentCount = isClassRecord ? (rec.Student_Enrolements ?? rec.student_enrolments ?? rec.studentCount ?? '') : '';
     return {
       id: rec.id,
       courseName: course.course_name || '',
@@ -15,6 +16,7 @@ export class CourseUtils {
       classUid: klass.unique_id,
       className: klass.class_name || '',
       startDate: klass.start_date || '',
+      studentCount: studentCount,
     };
   }
 }
