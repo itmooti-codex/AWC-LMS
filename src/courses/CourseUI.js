@@ -67,6 +67,11 @@ export class CourseUI {
     const classUrl = `https://courses.writerscentre.com.au/${roleSeg}/class/${c.classUid}`;
 
     if (role === "teacher" || role === "admin") {
+      // Require full content; skip incomplete cards for teacher/admin
+      const required = (
+        c.classUid && c.className && c.courseName && c.startDate && (c.studentCount !== undefined && c.studentCount !== '')
+      );
+      if (!required) return null;
       const wrap = document.createElement("div");
       wrap.className =
         "flex flex-col items-start gap-[24px] bg-white px-4 py-[24px]";
@@ -75,15 +80,41 @@ export class CourseUI {
       wrap.dataset.courseName = courseName;
       const inner = document.createElement("div");
       inner.className = "flex flex-col gap-4 w-full";
-      if (start) {
+      // Render start date badge if we can parse a valid timestamp
+      {
         const badge = document.createElement("div");
         badge.className =
           "flex items-center justify-center gap-2 rounded bg-[#ebf6f6] px-2 py-0.5";
         const badgeText = document.createElement("div");
         badgeText.className = "serif text-smallText text-[#007b8e]";
-        badgeText.textContent = `Start Date: ${start}`;
-        badge.appendChild(badgeText);
-        wrap.appendChild(badge);
+        // Format UNIX seconds or ms to DD-MM-YYYY
+        const fmt = (d) => {
+          try {
+            let ms;
+            if (d === null || d === undefined || d === '') return '';
+            const n = Number(d);
+            if (!Number.isNaN(n)) {
+              // If seconds (e.g., 1736125200), convert to ms
+              ms = n < 1e12 ? n * 1000 : n;
+            } else {
+              const dt2 = new Date(d);
+              if (isNaN(dt2.getTime())) return '';
+              ms = dt2.getTime();
+            }
+            const dt = new Date(ms);
+            if (isNaN(dt.getTime())) return '';
+            const dd = String(dt.getDate()).padStart(2, '0');
+            const mm = String(dt.getMonth() + 1).padStart(2, '0');
+            const yyyy = dt.getFullYear();
+            return `${dd}-${mm}-${yyyy}`;
+          } catch (_) { return ''; }
+        };
+        const formatted = fmt(start);
+        if (formatted) {
+          badgeText.textContent = `Start Date: ${formatted}`;
+          badge.appendChild(badgeText);
+          wrap.appendChild(badge);
+        }
       }
       // Class name (primary)
       const titleDiv = document.createElement("div");
@@ -104,7 +135,7 @@ export class CourseUI {
       countRow.className = "flex items-center justify-start gap-2";
       const avatar = document.createElement("div");
       avatar.className = "relative h-4 w-4 overflow-hidden";
-      avatar.innerHTML = `<img src="${img}" style="height:100%; width:100%;" />`;
+      avatar.innerHTML = `<img src="https://file.ontraport.com/media/7a63ff235f664be8af257390800637fc.phpremyez?Expires=4891665563&Signature=W9rhpaAwsYnuccv8skR3PmSO3o-vMAZP64AT5OvxHqG54IBDt4Gx~yZO~c6dTKj00h6YSmMjnqpAYgBpAYUt~Q7JQouBCNMM7tzXwkjv3rNzRm9J4m3rT9pKWMIS3kYTACQkt5W0sLy~A8okbSuUxA7e~-HhaD2TT5hhaX5AV3JZZF0lVdGdsXhQgDgjb-kcxpDVRYysszXvNLDTB~JgJRt7DYHL-Yiy11nFbrETm3vS9Ep68kIHqkQxjTIHBuoXWQ8mM~ae4eqS7kaui5T1T03YWdjJyelBhG9j~BFQwU~Lq6XnsCdSAgeAbTfKAQ8OY5v4kt4rBMdBhw6-sTn7DQ__&Key-Pair-Id=APKAJVAAMVW6XQYWSTNA" style="height:100%; width:100%;" />`;
       const countText = document.createElement("div");
       const total = Number(c.studentCount || 0) || 0;
       countText.innerHTML = `<span class="serif text-smallText text-[#586a80]">${total} ${total === 1 ? 'Student' : 'Students'}</span>`;
@@ -190,9 +221,13 @@ export class CourseUI {
       return;
     }
     const pool = CourseUI._ensurePool();
-    const nextKeys = new Set(
-      (list || []).map((c) => String(c.classUid || c.courseUid || c.id))
-    );
+    // Build nodes first (allows skipping invalid teacher/admin cards)
+    const nodes = [];
+    for (const c of (list || [])) {
+      const node = CourseUI.renderHomeItem(c);
+      if (node) nodes.push({ key: String(c.classUid || c.courseUid || c.id), node });
+    }
+    const nextKeys = new Set(nodes.map(n => n.key));
     // Move non-needed children to pool (preserve image nodes to avoid reload)
     const toMove = [];
     for (const child of Array.from(container.children)) {
@@ -202,26 +237,16 @@ export class CourseUI {
     toMove.forEach((el) => pool.appendChild(el));
 
     // Append in order, reusing from container or pool or creating new
-    for (const c of list || []) {
-      const key = String(c.classUid || c.courseUid || c.id);
-      let node = Array.from(container.children).find(
-        (ch) => ch.dataset?.key === key
-      );
-      if (!node)
-        node = Array.from(pool.children).find((ch) => ch.dataset?.key === key);
-      if (!node) node = CourseUI.renderHomeItem(c);
-      // Ensure minimal text updates if node reused
-      if (node && node.dataset) {
-        node.dataset.className = c.className || "";
-        node.dataset.courseName = c.courseName || "";
-      }
+    for (const { key, node: desired } of nodes) {
+      let node = Array.from(container.children).find((ch) => ch.dataset?.key === key);
+      if (!node) node = Array.from(pool.children).find((ch) => ch.dataset?.key === key);
+      if (!node) node = desired;
       container.appendChild(node);
     }
 
     // If empty, show placeholder
     if (!container.children.length) {
-      container.innerHTML =
-        '<div class="p-2 text-sm text-gray-500">No courses</div>';
+      container.innerHTML = '<div class="p-2 text-sm text-gray-500">No courses</div>';
     }
   }
 }

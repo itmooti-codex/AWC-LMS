@@ -48,6 +48,7 @@ export class CourseCore {
       .query()
       .select(['id', 'unique_id', 'class_name', 'start_date', 'Student_Enrolements'])
       .include('Course', q1 => q1.deSelectAll().select(['unique_id', 'course_name', 'image', 'module__count__visible', 'description']))
+      .include('Enrolments', q1 => q1.select(['id']))
       .limit(this.limit)
       .offset(0)
       .noDestroy();
@@ -81,8 +82,11 @@ export class CourseCore {
       const payload = await this.query.fetchDirect().toPromise();
       const rawRecords = Array.isArray(payload?.resp) ? payload.resp : [];
       let recs = rawRecords.map(CourseUtils.mapSdkEnrolmentToUi);
-      // Client-side sort by course name ascending
-      try { recs.sort((a, b) => String(a.courseName || '').localeCompare(String(b.courseName || ''), undefined, { sensitivity: 'base' })); } catch (_) {}
+      // Sort by class name ascending (fallback to course name)
+      try {
+        recs.sort((a, b) => String(a.className || '').localeCompare(String(b.className || ''), undefined, { sensitivity: 'base' })
+          || String(a.courseName || '').localeCompare(String(b.courseName || ''), undefined, { sensitivity: 'base' }));
+      } catch (_) {}
       // Persist fresh list for warm reloads
       this.writeCache(recs);
       const newSig = this.listSignature(recs);
