@@ -241,9 +241,16 @@ export class NotificationCore {
               if (typeof qx.whereIn === 'function') return qx.whereIn('alert_type', ['Post Comment', 'Post Comment Mention']);
               qx.where('alert_type', 'Post Comment').orWhere('alert_type', 'Post Comment Mention');
             })
-            .andWhere('Parent_Comment', q1 =>
-              q1.andWhere('Forum_Post', q2 => q2.where('author_id', Number(uid)))
-            )
+            .andWhere(q2 => {
+              // Comments on my posts OR replies to my comments
+              if (typeof q2.orWhere === 'function') {
+                q2
+                  .where('Parent_Comment', q3 => q3.andWhere('Forum_Post', q4 => q4.where('author_id', Number(uid))))
+                  .orWhere('Parent_Comment', q3 => q3.where('author_id', Number(uid)));
+              } else {
+                q2.where('Parent_Comment', q3 => q3.andWhere('Forum_Post', q4 => q4.where('author_id', Number(uid))));
+              }
+            })
         );
       }
       if (!yes(p.submissionComments) && yes(p.commentsOnMySubmissions)) {
@@ -254,11 +261,23 @@ export class NotificationCore {
               if (typeof qx.whereIn === 'function') return qx.whereIn('alert_type', ['Submission Comment', 'Submission Comment Mention']);
               qx.where('alert_type', 'Submission Comment').orWhere('alert_type', 'Submission Comment Mention');
             })
-            .andWhere('Parent_Comment', q1 =>
-              q1.andWhere('Submissions', q2 =>
-                q2.andWhere('Student', q4 => q4.where('student_id', Number(uid)))
-              )
-            )
+            .andWhere(q2 => {
+              if (typeof q2.orWhere === 'function') {
+                q2
+                  .where('Parent_Comment', q3 =>
+                    q3.andWhere('Submissions', q4 =>
+                      q4.andWhere('Student', q5 => q5.where('student_id', Number(uid)))
+                    )
+                  )
+                  .orWhere('Parent_Comment', q3 => q3.where('author_id', Number(uid)));
+              } else {
+                q2.where('Parent_Comment', q3 =>
+                  q3.andWhere('Submissions', q4 =>
+                    q4.andWhere('Student', q5 => q5.where('student_id', Number(uid)))
+                  )
+                );
+              }
+            })
         );
       }
       if (!yes(p.announcementComments) && yes(p.commentsOnMyAnnouncements)) {
@@ -269,9 +288,15 @@ export class NotificationCore {
               if (typeof qx.whereIn === 'function') return qx.whereIn('alert_type', ['Announcement Comment', 'Announcement Comment Mention']);
               qx.where('alert_type', 'Announcement Comment').orWhere('alert_type', 'Announcement Comment Mention');
             })
-            .andWhere('Parent_Comment', q1 =>
-              q1.andWhere('Announcements', q2 => q2.where('instructor_id', Number(uid)))
-            )
+            .andWhere(q2 => {
+              if (typeof q2.orWhere === 'function') {
+                q2
+                  .where('Parent_Comment', q3 => q3.andWhere('Announcements', q4 => q4.where('instructor_id', Number(uid))))
+                  .orWhere('Parent_Comment', q3 => q3.where('author_id', Number(uid)));
+              } else {
+                q2.where('Parent_Comment', q3 => q3.andWhere('Announcements', q4 => q4.where('instructor_id', Number(uid))));
+              }
+            })
         );
       }
 

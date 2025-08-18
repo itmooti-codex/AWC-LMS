@@ -22,3 +22,5 @@ let adminType = "No".toLowerCase() === "yes" ? "Yes" : "No";
 let teacherType = "No".toLowerCase() === "yes" ? "Yes" : "No"; 
 let userTypeForSDK = ""; if (adminType === "Yes") { userTypeForSDK = "Admin"; } else if (teacherType === "Yes") { userTypeForSDK = "Teacher"; } else { userTypeForSDK = "Student"; } console.log({ userIdForSDK, adminType, teacherType, userTypeForSDK });
 </script>
+
+
