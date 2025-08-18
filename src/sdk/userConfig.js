@@ -1,26 +1,7 @@
-const debug_Notifications = false;
-const user_Preference_Turn_Off_All_Notifications = 'No';
-const Turn_Off_All_Notifications_Time_Unix = '';
-const user_Preference_Posts = 'Yes';
-const user_Preference_Submissions = 'Yes';
-const user_Preference_Announcements = 'Yes';
-const user_Preference_Post_Comments = 'Yes';
-const user_Preference_Submission_Comments = 'Yes';
-const user_Preference_Announcement_Comments = 'Yes';
-const user_Preference_Comments_On_My_Posts = 'Yes';
-const user_Preference_Comments_On_My_Submissions = 'Yes';
-const user_Preference_Comments_On_My_Announcements = 'Yes';
-const user_Preference_Post_Mentions = 'Yes';
-const user_Preference_Announcement_Mentions = 'Yes';
-const user_Preference_Submission_Mentions = 'Yes';
-const user_Preference_Announcement_Comment_Mentions = 'Yes';
-const user_Preference_Post_Comment_Mentions = 'Yes';
-const user_Preference_Submission_Comment_Mentions = 'Yes';
-
 export class UserConfig {
   constructor() {
-    this.userId = window.loggedinuserid ??= 10435;
-    this.userType = window.loggedinuserType ??= "Admin";
+    this.userId = window.loggedinuserid ??= userIdForSDK;
+    this.userType = window.loggedinuserType ??= userTypeForSDL;
     this.debug = {
       notifications: debug_Notifications,
     };
