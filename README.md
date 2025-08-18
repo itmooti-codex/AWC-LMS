@@ -73,3 +73,8 @@ This effectibvely checks for the eid that we need by checking class id and studf
 This all needs to be done before creating alerts, all data needs to be prepared and then alerts needs to be created.
 
  -->
+https://courses.writerscentre.com.au/students/course-details/2PGD7PS?eid=54465&selectedTab=courseChat&current-post-id=2466&classIdFromUrl=588&className=Test+Class+August&classUid=7ED47Q9&currentClassID=588&currentClassName=Test+Class+August&currentClassUniqueID=7ED47Q9
+
+https://courses.writerscentre.com.au/teachers/class/588?selectedTab=chats?current-post-id=2466
+
+https://courses.writerscentre.com.au/admin/class/588?selectedTab=chats?current-post-id=2466

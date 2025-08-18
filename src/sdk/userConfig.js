@@ -19,8 +19,8 @@ const user_Preference_Submission_Comment_Mentions = 'Yes';
 
 export class UserConfig {
   constructor() {
-    this.userId = window.loggedinuserid ??= 78;
-    this.userType = window.loggedinuserType ??= "Student";
+    this.userId = window.loggedinuserid ??= 10435;
+    this.userType = window.loggedinuserType ??= "Admin";
     this.debug = {
       notifications: debug_Notifications,
     };
