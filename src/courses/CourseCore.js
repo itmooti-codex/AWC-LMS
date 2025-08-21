@@ -115,6 +115,7 @@ export class CourseCore {
       return `awc:courses:${this.scope || 'nav'}:anon`;
     }
   }
+
   readCache() {
     try {
       const raw = localStorage.getItem(this.cacheKey());
@@ -126,6 +127,7 @@ export class CourseCore {
       return Array.isArray(parsed.list) ? parsed.list : null;
     } catch (_) { return null; }
   }
+
   writeCache(list) {
     try {
       const cap = (this.scope === 'nav') ? (this.limit || 10) : 500;
@@ -143,6 +145,7 @@ export class CourseCore {
       return (h >>> 0).toString(36);
     } catch (_) { return String(Math.abs(str?.length || 0)); }
   }
+
   listSignature(list) {
     try {
       const items = Array.isArray(list) ? list : [];
@@ -152,3 +155,4 @@ export class CourseCore {
     } catch (_) { return 's0'; }
   }
 }
+

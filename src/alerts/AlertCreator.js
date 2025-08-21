@@ -42,6 +42,78 @@ export function buildAlertPayload(payload = {}) {
   return out;
 }
 
+// Simple sleep helper
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+// Determine if an error is fatal (should not be retried)
+function isFatalError(err) {
+  try {
+    // HTTP-style status codes
+    const status = err?.status || err?.response?.status || err?.code;
+    if (status && [400, 401, 403, 404, 409, 422].includes(Number(status))) return true;
+    const msg = String(err?.message || '').toLowerCase();
+    // Common validation/authorization keywords
+    const fatalHints = [
+      'validation',
+      'invalid',
+      'unauthorized',
+      'forbidden',
+      'not found',
+      'schema',
+      'payload',
+      'required',
+      'must ',
+      'missing',
+    ];
+    if (fatalHints.some((h) => msg.includes(h))) return true;
+    // GraphQL errors array
+    const gqlErrors = err?.graphQLErrors || err?.errors;
+    if (Array.isArray(gqlErrors) && gqlErrors.length) {
+      const combined = gqlErrors.map((e) => String(e?.message || '').toLowerCase()).join(' | ');
+      if (fatalHints.some((h) => combined.includes(h))) return true;
+    }
+  } catch (_) {}
+  return false;
+}
+
+// Retry helper: keeps retrying until success or deemed fatal
+async function retryUntilSuccess(fn, {
+  initialDelayMs = 500,
+  maxDelayMs = 30_000,
+  factor = 2,
+  jitter = 0.2,
+  maxAttempts = Infinity,
+  onRetry,
+  isFatal = isFatalError,
+} = {}) {
+  let attempt = 0;
+  let delay = Math.max(0, Number(initialDelayMs) || 0);
+  // eslint-disable-next-line no-constant-condition
+  while (true) {
+    try {
+      return await fn(attempt);
+    } catch (err) {
+      attempt += 1;
+      if (typeof isFatal === 'function' && isFatal(err)) throw err;
+      if (Number.isFinite(maxAttempts) && attempt >= maxAttempts) throw err;
+      // Backoff with jitter
+      let sleepMs = delay;
+      if (sleepMs > 0 && Number(jitter) > 0) {
+        const j = Math.max(0, Number(jitter));
+        const delta = sleepMs * j;
+        sleepMs = Math.max(0, Math.round(sleepMs - delta + Math.random() * (2 * delta)));
+      }
+      if (typeof onRetry === 'function') {
+        try { onRetry(err, attempt, sleepMs); } catch (_) {}
+      }
+      if (sleepMs > 0) await sleep(sleepMs);
+      delay = Math.min(maxDelayMs, Math.max(0, Math.round(delay * (factor || 1) || 0)) || sleepMs || initialDelayMs || 500);
+    }
+  }
+}
+
 async function tryCreateViaMutation(plugin, payload) {
   if (!plugin || typeof plugin.mutation !== 'function') {
     throw new Error('SDK mutation helper unavailable');
@@ -99,28 +171,39 @@ async function tryCreateViaGraphQL(plugin, payload) {
 }
 
 export async function createAlert(payload = {}) {
-  const plugin = await getPlugin();
   const clean = buildAlertPayload(payload);
-  try {
-    return await tryCreateViaMutation(plugin, clean);
-  } catch (_) {
-    return await tryCreateViaGraphQL(plugin, clean);
-  }
+  // Allow runtime override via window.AWC.alertsRetryConfig
+  const cfg = (window?.AWC?.alertsRetryConfig) || {};
+  return retryUntilSuccess(async () => {
+    const plugin = await getPlugin();
+    try {
+      return await tryCreateViaMutation(plugin, clean);
+    } catch (_) {
+      return await tryCreateViaGraphQL(plugin, clean);
+    }
+  }, cfg);
 }
 
 export async function createAlerts(payloads = [], { concurrency = 3 } = {}) {
-  const plugin = await getPlugin();
   const list = Array.isArray(payloads) ? payloads : [payloads];
   let idx = 0;
   const errors = [];
+  const cfg = (window?.AWC?.alertsRetryConfig) || {};
   async function worker() {
     while (idx < list.length) {
       const i = idx++;
       const p = buildAlertPayload(list[i]);
       try {
-        await tryCreateViaMutation(plugin, p);
-      } catch (_) {
-        try { await tryCreateViaGraphQL(plugin, p); } catch (e) { errors.push({ index: i, error: e }); }
+        await retryUntilSuccess(async () => {
+          const plugin = await getPlugin();
+          try {
+            return await tryCreateViaMutation(plugin, p);
+          } catch (_) {
+            return await tryCreateViaGraphQL(plugin, p);
+          }
+        }, cfg);
+      } catch (e) {
+        errors.push({ index: i, error: e, fatal: true });
       }
     }
   }

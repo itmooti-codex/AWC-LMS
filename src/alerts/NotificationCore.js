@@ -322,21 +322,39 @@ export class NotificationCore {
       // Comments on my entities (authorship checks)
       if (!yes(p.postComments) && yes(p.commentsOnMyPosts)) {
         // Fallback: include post comment types when "my" is on but base is off
-        addBranch(sub => {
-          if (typeof sub.whereIn === 'function') return sub.whereIn('alert_type', ['Post Comment','Post Comment Mention']);
-          sub.where('alert_type','Post Comment').orWhere('alert_type','Post Comment Mention');
+        addBranch((sub) => {
+          if (typeof sub.whereIn === "function")
+            return sub.whereIn("alert_type", [
+              "Post Comment",
+              "Post Comment Mention",
+            ]);
+          sub
+            .where("alert_type", "Post Comment")
+            .orWhere("alert_type", "Post Comment Mention");
         });
       }
       if (!yes(p.submissionComments) && yes(p.commentsOnMySubmissions)) {
-        addBranch(sub => {
-          if (typeof sub.whereIn === 'function') return sub.whereIn('alert_type', ['Submission Comment','Submission Comment Mention']);
-          sub.where('alert_type','Submission Comment').orWhere('alert_type','Submission Comment Mention');
+        addBranch((sub) => {
+          if (typeof sub.whereIn === "function")
+            return sub.whereIn("alert_type", [
+              "Submission Comment",
+              "Submission Comment Mention",
+            ]);
+          sub
+            .where("alert_type", "Submission Comment")
+            .orWhere("alert_type", "Submission Comment Mention");
         });
       }
       if (!yes(p.announcementComments) && yes(p.commentsOnMyAnnouncements)) {
-        addBranch(sub => {
-          if (typeof sub.whereIn === 'function') return sub.whereIn('alert_type', ['Announcement Comment','Announcement Comment Mention']);
-          sub.where('alert_type','Announcement Comment').orWhere('alert_type','Announcement Comment Mention');
+        addBranch((sub) => {
+          if (typeof sub.whereIn === "function")
+            return sub.whereIn("alert_type", [
+              "Announcement Comment",
+              "Announcement Comment Mention",
+            ]);
+          sub
+            .where("alert_type", "Announcement Comment")
+            .orWhere("alert_type", "Announcement Comment Mention");
         });
       }
 
@@ -398,7 +416,9 @@ export class NotificationCore {
       preferences: { ...(userConfig.preferences || {}) },
       addedAnyBranch,
     };
-    try { window.__awcLastPrefs = this.lastQueryDebug.preferences; } catch(_) {}
+    try {
+      window.__awcLastPrefs = this.lastQueryDebug.preferences;
+    } catch (_) {}
     return q;
   }
 
@@ -414,6 +434,7 @@ export class NotificationCore {
       return String(Math.abs(str.length || 0));
     }
   }
+
   prefsSignature() {
     try {
       const prefs = userConfig?.preferences || {};
@@ -424,6 +445,7 @@ export class NotificationCore {
       return "p0";
     }
   }
+
   classSignature(classIds = []) {
     try {
       const ids = Array.isArray(classIds)
@@ -434,6 +456,7 @@ export class NotificationCore {
       return "c0";
     }
   }
+
   cacheKey(classIds) {
     const uid = userConfig.userId ?? "anon";
     const type = String(userConfig.userType || "unknown").toLowerCase();
@@ -441,6 +464,7 @@ export class NotificationCore {
     const cSig = this.classSignature(classIds || this.classIds || []);
     return `awc:alerts:v1:${this.scope}:${type}:${uid}:${pSig}:${cSig}`;
   }
+
   readCache(classIds) {
     try {
       const raw = localStorage.getItem(this.cacheKey(classIds));
@@ -457,6 +481,7 @@ export class NotificationCore {
       return null;
     }
   }
+
   writeCache(list, classIds) {
     try {
       const cap = this.scope === "nav" ? this.limit || 5 : 100;
@@ -471,6 +496,7 @@ export class NotificationCore {
       localStorage.setItem(this.cacheKey(classIds), value);
     } catch (_) {}
   }
+
   getCachedClassIdsSync() {
     try {
       const userType = String(userConfig.userType || "").toLowerCase();
@@ -483,6 +509,7 @@ export class NotificationCore {
       return [];
     }
   }
+
   preRenderFromCache() {
     const el = document.getElementById(this.targetElementId);
     if (!el) return false;
@@ -500,6 +527,7 @@ export class NotificationCore {
       return false;
     }
   }
+
   async start() {
     const el = document.getElementById(this.targetElementId);
     if (!el) return;
@@ -611,3 +639,4 @@ export class NotificationCore {
     }
   }
 }
+
