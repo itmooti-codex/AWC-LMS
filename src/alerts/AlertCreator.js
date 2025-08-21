@@ -1,20 +1,4 @@
-import { config } from '../sdk/config.js';
-import { VitalStatsSDK } from '../sdk/init.js';
-
-let cachedPlugin = null;
-
-async function getPlugin() {
-  if (cachedPlugin && typeof cachedPlugin.mutation === 'function') return cachedPlugin;
-  if (window.tempPlugin && typeof window.tempPlugin.mutation === 'function') {
-    cachedPlugin = window.tempPlugin;
-    return cachedPlugin;
-  }
-  const sdk = new VitalStatsSDK({ slug: config.slug, apiKey: config.apiKey });
-  const plugin = await sdk.initialize();
-  window.tempPlugin ??= plugin;
-  cachedPlugin = plugin;
-  return plugin;
-}
+// Alerts Creator: direct GraphQL (no SDK)
 
 const ALLOWED_FIELDS = new Set([
   'alert_type',
@@ -114,102 +98,52 @@ async function retryUntilSuccess(fn, {
   }
 }
 
-async function tryCreateViaMutation(plugin, payload) {
-  if (!plugin || typeof plugin.mutation !== 'function') {
-    throw new Error('SDK mutation helper unavailable');
+// Basic GraphQL fetcher using globals (courseChat context)
+async function gqlFetch(query, variables = {}) {
+  const endpoint = window.graphqlApiEndpoint || (typeof graphqlApiEndpoint !== 'undefined' ? graphqlApiEndpoint : null);
+  const apiKey = window.apiAccessKey || (typeof apiAccessKey !== 'undefined' ? apiAccessKey : null);
+  if (!endpoint || !apiKey) throw new Error('GraphQL endpoint or API key not configured');
+  const res = await fetch(endpoint, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Api-Key': apiKey },
+    body: JSON.stringify({ query, variables })
+  });
+  if (!res.ok) {
+    const detail = await res.text().catch(() => '');
+    const err = new Error(`GraphQL request failed: ${res.status} ${res.statusText}`);
+    err.status = res.status;
+    err.detail = detail;
+    throw err;
   }
-
-  const resolveModelName = () => {
-    try {
-      if (plugin.MODEL_NAMES && plugin.MODEL_NAMES.ALERT) return plugin.MODEL_NAMES.ALERT;
-    } catch (_) {}
-    try {
-      // Try to find by common schema name
-      const models = (typeof plugin.getState === 'function') ? plugin.getState() : {};
-      for (const modelName in models) {
-        if (modelName === 'AwcAlert') return modelName;
-      }
-    } catch (_) {}
-    return 'AwcAlert';
-  };
-
-  // Prefer switchToId when available and resolvable; otherwise fallback to switchTo(schemaName)
-  const tryWith = async (useId) => {
-    const m = plugin.mutation();
-    const target = useId ? m.switchToId('ALERT') : m.switchTo(resolveModelName());
-    try {
-      // Strategy 1: insert([...])
-      const res = await target
-        .insert(q => q.values([payload]))
-        .execute(true)
-        .toPromise();
-      return res;
-    } catch (_) {}
-    // Strategy 2: create([...])
-    const res = await target
-      .create(q => q.values([payload]))
-      .execute(true)
-      .toPromise();
-    return res;
-  };
-
-  try {
-    return await tryWith(true);
-  } catch (_) {
-    // Fall back to using schema name directly
-    return await tryWith(false);
+  const json = await res.json();
+  if (json && Array.isArray(json.errors) && json.errors.length) {
+    const err = new Error(json.errors.map(e => e.message).join(' | '));
+    err.status = 200;
+    err.errors = json.errors;
+    throw err;
   }
-}
-
-async function tryCreateViaGraphQL(plugin, payload) {
-  if (!plugin.graphql) throw new Error('SDK GraphQL helper unavailable');
-  const query = `mutation createAlert($payload: AlertCreateInput) {\n  createAlert(payload: $payload) { id title alert_type created_at }\n}`;
-  const res = await plugin.graphql(query, { payload });
-  // Some SDKs return Observables
-  if (res && typeof res.toPromise === 'function') return res.toPromise();
-  return res;
+  return json?.data || null;
 }
 
 export async function createAlert(payload = {}) {
   const clean = buildAlertPayload(payload);
-  // Allow runtime override via window.AWC.alertsRetryConfig
   const cfg = (window?.AWC?.alertsRetryConfig) || {};
+  const query = `mutation createAlerts($payload: [AlertCreateInput] = null) {\n  createAlerts(payload: $payload) { is_mentioned }\n}`;
   return retryUntilSuccess(async () => {
-    const plugin = await getPlugin();
-    try {
-      return await tryCreateViaMutation(plugin, clean);
-    } catch (_) {
-      return await tryCreateViaGraphQL(plugin, clean);
-    }
+    const data = await gqlFetch(query, { payload: [clean] });
+    return data?.createAlerts;
   }, cfg);
 }
 
-export async function createAlerts(payloads = [], { concurrency = 3 } = {}) {
+export async function createAlerts(payloads = []) {
   const list = Array.isArray(payloads) ? payloads : [payloads];
-  let idx = 0;
-  const errors = [];
+  const clean = list.map(buildAlertPayload);
   const cfg = (window?.AWC?.alertsRetryConfig) || {};
-  async function worker() {
-    while (idx < list.length) {
-      const i = idx++;
-      const p = buildAlertPayload(list[i]);
-      try {
-        await retryUntilSuccess(async () => {
-          const plugin = await getPlugin();
-          try {
-            return await tryCreateViaMutation(plugin, p);
-          } catch (_) {
-            return await tryCreateViaGraphQL(plugin, p);
-          }
-        }, cfg);
-      } catch (e) {
-        errors.push({ index: i, error: e, fatal: true });
-      }
-    }
-  }
-  const pool = Array.from({ length: Math.max(1, Number(concurrency) || 1) }, () => worker());
-  await Promise.all(pool);
-  return { total: list.length, failed: errors.length, errors };
+  const query = `mutation createAlerts($payload: [AlertCreateInput] = null) {\n  createAlerts(payload: $payload) { is_mentioned }\n}`;
+  return retryUntilSuccess(async () => {
+    const data = await gqlFetch(query, { payload: clean });
+    return data?.createAlerts;
+  }, cfg);
 }
 
 // Expose global helpers for convenient usage across the app
