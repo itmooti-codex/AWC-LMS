@@ -153,7 +153,7 @@ window.AWC.createAlerts = createAlerts;
 window.AWC.buildAlertPayload = buildAlertPayload;
 
 // Canonical alert URL builder
-// role: 'admin' | 'teachers' | 'students'
+// role: 'admin' | 'teacher' | 'students'
 // category: 'post' | 'announcement' | 'submission'
 // params: { classId, classUid, className, courseUid, eid, postId, commentId, parentPostId, announcementId, lessonUid, assessmentType, subUID, commentScrollID, notType }
 function buildAlertUrl(role, category, params = {}) {
@@ -183,9 +183,9 @@ function buildAlertUrl(role, category, params = {}) {
   const submissionId = p.submissionId;
   const idForSubmission = (p.isComment ? (commentId || '') : (submissionId || commentId || ''));
 
-  // Admin/Teacher routes
+  // Admin/Teacher routes (accepts legacy 'teachers' but outputs '/teacher/')
   if (r === 'admin' || r === 'teachers' || r === 'teacher') {
-    const roleSeg = (r === 'admin') ? 'admin' : 'teachers';
+    const roleSeg = (r === 'admin') ? 'admin' : 'teacher';
     if (c === 'post') {
       // Use class unique_id in path for admin/teacher views
       return `${BASE}/${roleSeg}/class/${encodeURIComponent(classUid || '')}?selectedTab=chats?current-post-id=${idForPost}`;

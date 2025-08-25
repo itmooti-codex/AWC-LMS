@@ -63,7 +63,7 @@ export class CourseUI {
     const className = c.className || "";
     const start = c.startDate || "";
     const url = `https://courses.writerscentre.com.au/students/course-details/${c.courseUid}?eid=${id}`;
-    const roleSeg = role === 'admin' ? 'admin' : 'teachers';
+    const roleSeg = role === 'admin' ? 'admin' : 'teacher';
     const classUrl = `https://courses.writerscentre.com.au/${roleSeg}/class/${c.classUid}`;
 
     if (role === "teacher" || role === "admin") {
