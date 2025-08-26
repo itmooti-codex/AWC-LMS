@@ -199,8 +199,9 @@ function buildAlertUrl(role, category, params = {}) {
       const qs = new URLSearchParams();
       qs.set('submissionPostIs', String(idForSubmission || ''));
       if (assessmentType === 'File Submission') {
-        if (subUID) qs.set('subUID', String(subUID));
-        if (commentScrollID) qs.set('commentScrollId', String(commentScrollID));
+        // Always include keys even if values are undefined, per spec
+        qs.set('subUID', String(subUID));
+        qs.set('commentScrollId', String(commentScrollID));
       }
       if (classId != null) qs.set('classIdFromUrl', String(classId));
       if (className) qs.set('className', String(className));
@@ -255,8 +256,9 @@ function buildAlertUrl(role, category, params = {}) {
       if (classUid) qs.set('currentClassUniqueID', String(classUid));
       qs.set('submissionPostIs', String(idForSubmission || ''));
       if (assessmentType === 'File Submission') {
-        if (subUID) qs.set('subUID', String(subUID));
-        if (commentScrollID) qs.set('commentScrollId', String(commentScrollID));
+        // Always include keys even if values are undefined, per spec
+        qs.set('subUID', String(subUID));
+        qs.set('commentScrollId', String(commentScrollID));
       }
       if (notType) qs.set('notType', String(notType));
       return `${base}?${qs.toString()}`;
