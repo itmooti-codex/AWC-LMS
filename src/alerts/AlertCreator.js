@@ -195,20 +195,19 @@ function buildAlertUrl(role, category, params = {}) {
       return `${BASE}/${roleSeg}/class/${encodeURIComponent(classUid || '')}?selectedTab=announcements?data-announcement-template-id=${idForAnnouncement}`;
     }
     if (c === 'submission') {
-      const base = new URL(`${BASE}/course-details/content/${encodeURIComponent(lessonUid || '')}`);
-      const params = new URLSearchParams();
-      params.set('submissionPostIs', String(idForSubmission || ''));
+      const base = `${BASE}/course-details/content/${encodeURIComponent(lessonUid || '')}`;
+      const qs = new URLSearchParams();
+      qs.set('submissionPostIs', String(idForSubmission || ''));
       if (assessmentType === 'File Submission') {
-        if (subUID) params.set('subUID', String(subUID));
-        if (commentScrollID) params.set('commentScrollId', String(commentScrollID));
+        if (subUID) qs.set('subUID', String(subUID));
+        if (commentScrollID) qs.set('commentScrollId', String(commentScrollID));
       }
-      if (classId != null) params.set('classIdFromUrl', String(classId));
-      if (className) params.set('className', String(className));
-      if (classUid) params.set('classUid', String(classUid));
-      if (classId != null) params.set('currentClassID', String(classId));
-      if (className) params.set('currentClassName', String(className));
-      if (classUid) params.set('currentClassName', String(className));
-      return `${base.toString()}?${params.toString()}`;
+      if (classId != null) qs.set('classIdFromUrl', String(classId));
+      if (className) qs.set('className', String(className));
+      if (classUid) qs.set('classUid', String(classUid));
+      if (classId != null) qs.set('currentClassID', String(classId));
+      if (className) qs.set('currentClassName', String(className));
+      return `${base}?${qs.toString()}`;
     }
   }
 
