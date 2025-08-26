@@ -1,0 +1,5 @@
+https://courses.writerscentre.com.au/course-details/content/${lessonUid}?eid=${myEidFromLesson}&classIdFromUrl=${classIdUrl}&className=${classNameUrl}&classUid=${classUniqueId}&currentClassID=${classIdUrl}&currentClassName=${classNameUrl}&currentClassUniqueID=${classUniqueId}&submissionPostIs=${notification.Notification_Type === 'Submission Comments' ? notification.Submissions_ID : commentIdForNoti}${assessmentType === "File Submission" ? `&subUID=${subUID}&commentScrollId=${commentScrollID}` : ""}&notType=${notification.Notification_Type}
+
+
+`https://courses.writerscentre.com.au/course-details/content/${lessonUid}?submissionPostIs=${notification.Notification_Type === 'Submissions' ? notification.Submissions_ID : commentIdForNoti}${assessmentType === "File Submission" ? `&subUID=${subUID}&commentScrollId=${commentScrollID}` : ""}&classIdFromUrl=${classIdUrl}&className=${classNameUrl}&classUid=${classIDForADmin}&currentClassID=${classIdUrl}&currentClassName=${classNameUrl}`
+   
