@@ -181,7 +181,9 @@ function buildAlertUrl(role, category, params = {}) {
   const idForAnnouncement = (announcementId || commentId || '');
   // For submissions: base event -> submissionId; comment -> commentId
   const submissionId = p.submissionId;
-  const idForSubmission = (p.isComment ? (commentId || '') : (submissionId || commentId || ''));
+  // For submissions: submissionPostIs should always be the submission id;
+  // scrolling is handled via commentScrollId when present.
+  const idForSubmission = (submissionId || commentId || '');
 
   // Admin/Teacher routes (accepts legacy 'teachers' but outputs '/teacher/')
   if (r === 'admin' || r === 'teachers' || r === 'teacher') {
