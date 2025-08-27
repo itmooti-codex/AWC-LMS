@@ -427,36 +427,34 @@ export class NotificationCore {
       }
       if (!yes(p.announcementComments) && yes(p.commentsOnMyAnnouncements)) {
         // Limit to raw comment events (exclude mentions here to avoid pulling unrelated threads)
-        addBranch((sub) => {
-          sub.where("alert_type", "Announcement Comment");
-          // Ownership constraints: comments on my announcements OR replies to my comments
-          const owned = this._ownedIds || {};
-          const myAnn = Array.isArray(owned.myAnnouncementIds) ? owned.myAnnouncementIds : [];
-          const myCom = Array.isArray(owned.myCommentIds) ? owned.myCommentIds : [];
-          sub.andWhere((qx) => {
-            const addWhereIn = (builder, field, values) => {
-              if (typeof builder.whereIn === "function") return builder.whereIn(field, values);
-              values.forEach((v, i) => {
-                if (i === 0) builder.where(field, v);
-                else builder.orWhere(field, v);
-              });
-            };
-            let applied = false;
-            if (myAnn.length) {
-              addWhereIn(qx, "parent_announcement_id", myAnn);
-              applied = true;
-            }
-            if (myCom.length) {
-              const add = (b) => addWhereIn(b, "parent_comment_id", myCom);
-              if (applied) qx.orWhere((b) => add(b));
-              else add(qx);
-              applied = true;
-            }
-            if (!applied) {
-              try { qx.where("id", -1); } catch (_) {}
-            }
+        const owned = this._ownedIds || {};
+        const myAnn = Array.isArray(owned.myAnnouncementIds) ? owned.myAnnouncementIds : [];
+        const myCom = Array.isArray(owned.myCommentIds) ? owned.myCommentIds : [];
+        if (myAnn.length || myCom.length) {
+          addBranch((sub) => {
+            sub.where("alert_type", "Announcement Comment");
+            // Ownership constraints: comments on my announcements OR replies to my comments
+            sub.andWhere((qx) => {
+              const addWhereIn = (builder, field, values) => {
+                if (typeof builder.whereIn === "function") return builder.whereIn(field, values);
+                values.forEach((v, i) => {
+                  if (i === 0) builder.where(field, v);
+                  else builder.orWhere(field, v);
+                });
+              };
+              let applied = false;
+              if (myAnn.length) {
+                addWhereIn(qx, "parent_announcement_id", myAnn);
+                applied = true;
+              }
+              if (myCom.length) {
+                const add = (b) => addWhereIn(b, "parent_comment_id", myCom);
+                if (applied) qx.orWhere((b) => add(b));
+                else add(qx);
+              }
+            });
           });
-        });
+        }
       }
 
       // Comment mentions are handled above with base categories; mention-only handled when base is off
