@@ -190,9 +190,10 @@ function buildAlertUrl(role, category, params = {}) {
     // Per requirement: teacher and admin use the SAME URL format for announcements,
     // and values are stored into separate fields (origin_url_teacher, origin_url_admin)
     if (c === 'announcement') {
-      const classIdForAdmin = classId; // numeric id
+      // Use class unique_id in path (not numeric id)
+      const classIdentifier = classUid; // required unique id
       const templateId = (commentId != null && Number(commentId) > 0) ? commentId : idForAnnouncement;
-      return `${BASE}/admin/class/${encodeURIComponent(classIdForAdmin || '')}?selectedTab=announcements?data-announcement-template-id=${templateId || ''}`;
+      return `${BASE}/admin/class/${encodeURIComponent(classIdentifier || '')}?selectedTab=announcements?data-announcement-template-id=${templateId || ''}`;
     }
     if (c === 'post') {
       // Preserve previous behavior for posts
