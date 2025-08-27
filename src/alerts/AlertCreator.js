@@ -185,23 +185,26 @@ function buildAlertUrl(role, category, params = {}) {
   // scrolling is handled via commentScrollId when present.
   const idForSubmission = (submissionId || commentId || '');
 
-  // Admin/Teacher routes (accepts legacy 'teachers' but outputs '/teacher/')
+  // Admin/Teacher routes
   if (r === 'admin' || r === 'teachers' || r === 'teacher') {
-    const roleSeg = (r === 'admin') ? 'admin' : 'teacher';
+    // Per requirement: teacher and admin use the SAME URL format for announcements,
+    // and values are stored into separate fields (origin_url_teacher, origin_url_admin)
+    if (c === 'announcement') {
+      const classIdForAdmin = classId; // numeric id
+      const templateId = (commentId != null && Number(commentId) > 0) ? commentId : idForAnnouncement;
+      return `${BASE}/admin/class/${encodeURIComponent(classIdForAdmin || '')}?selectedTab=announcements?data-announcement-template-id=${templateId || ''}`;
+    }
     if (c === 'post') {
-      // Use class unique_id in path for admin/teacher views
+      // Preserve previous behavior for posts
+      const roleSeg = (r === 'admin') ? 'admin' : 'teacher';
       return `${BASE}/${roleSeg}/class/${encodeURIComponent(classUid || '')}?selectedTab=chats?current-post-id=${idForPost}`;
     }
-    if (c === 'announcement') {
-      // Use class unique_id in path for admin/teacher views
-      return `${BASE}/${roleSeg}/class/${encodeURIComponent(classUid || '')}?selectedTab=announcements?data-announcement-template-id=${idForAnnouncement}`;
-    }
     if (c === 'submission') {
+      // Keep previous behavior intact for submissions
       const base = `${BASE}/course-details/content/${encodeURIComponent(lessonUid || '')}`;
       const qs = new URLSearchParams();
       qs.set('submissionPostIs', String(idForSubmission || ''));
       if (assessmentType === 'File Submission') {
-        // Always include keys even if values are undefined, per spec
         qs.set('subUID', String(subUID));
         qs.set('commentScrollId', String(commentScrollID));
       }
