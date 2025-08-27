@@ -6,6 +6,9 @@ import { CacheTTLs } from "../utils/cacheConfig.js";
 const userConfig = new UserConfig();
 // Cache class IDs per user to avoid duplicate network calls across instances
 const classIdsCache = new Map(); // key: `${userConfig.userType}:${userConfig.userId}` -> { value: number[], promise?: Promise<number[]> }
+// Cache my announcement IDs and my comment IDs to perform ownership checks
+const myAnnouncementsCache = new Map(); // key: `${userConfig.userId}` -> { value: number[], promise?: Promise<number[]> }
+const myCommentsCache = new Map(); // key: `${userConfig.userId}` -> { value: number[], promise?: Promise<number[]> }
 
 export class NotificationCore {
   constructor({
@@ -129,6 +132,82 @@ export class NotificationCore {
     return uniq;
   }
 
+  async fetchMyAnnouncementIds() {
+    const uid = String(userConfig.userId);
+    if (!uid) return [];
+    const cached = myAnnouncementsCache.get(uid);
+    if (cached?.value) return cached.value;
+    if (cached?.promise) return cached.promise;
+    const run = async () => {
+      try {
+        const model = typeof this.plugin.switchTo === "function"
+          ? this.plugin.switchTo("calcAnnouncements")
+          : this.plugin.switchToId && this.plugin.switchToId("calcAnnouncements");
+        const q = model
+          .query()
+          .select(["id"]) // id of announcement
+          .where("instructor_id", Number(uid))
+          .limit(10000)
+          .offset(0)
+          .noDestroy();
+        const payload = await q.fetchDirect().toPromise();
+        const recs = Array.isArray(payload?.resp) ? payload.resp : [];
+        const ids = recs.map((r) => r.id).filter(Boolean);
+        return Array.from(new Set(ids));
+      } catch (_) {
+        return [];
+      }
+    };
+    const p = run();
+    myAnnouncementsCache.set(uid, { promise: p });
+    try {
+      const v = await p;
+      myAnnouncementsCache.set(uid, { value: v });
+      return v;
+    } catch (e) {
+      myAnnouncementsCache.delete(uid);
+      throw e;
+    }
+  }
+
+  async fetchMyCommentIds() {
+    const uid = String(userConfig.userId);
+    if (!uid) return [];
+    const cached = myCommentsCache.get(uid);
+    if (cached?.value) return cached.value;
+    if (cached?.promise) return cached.promise;
+    const run = async () => {
+      try {
+        const model = typeof this.plugin.switchTo === "function"
+          ? this.plugin.switchTo("calcForumComments")
+          : this.plugin.switchToId && this.plugin.switchToId("calcForumComments");
+        const q = model
+          .query()
+          .select(["id"]) // id of comment
+          .where("author_id", Number(uid))
+          .limit(10000)
+          .offset(0)
+          .noDestroy();
+        const payload = await q.fetchDirect().toPromise();
+        const recs = Array.isArray(payload?.resp) ? payload.resp : [];
+        const ids = recs.map((r) => r.id).filter(Boolean);
+        return Array.from(new Set(ids));
+      } catch (_) {
+        return [];
+      }
+    };
+    const p = run();
+    myCommentsCache.set(uid, { promise: p });
+    try {
+      const v = await p;
+      myCommentsCache.set(uid, { value: v });
+      return v;
+    } catch (e) {
+      myCommentsCache.delete(uid);
+      throw e;
+    }
+  }
+
   buildQuery(classIds = []) {
     const q = this.alertsModel
       .query()
@@ -174,6 +253,7 @@ export class NotificationCore {
     }
 
     // Apply user preference conditions for alert types, mentions, and ownership checks
+    // Use preferences as-is. Toggling handled on page.
     const p = userConfig.preferences || {};
     const yes = (v) => String(v).trim().toLowerCase() === "yes";
 
@@ -236,18 +316,18 @@ export class NotificationCore {
             if (typeof qx.whereIn === "function")
               return qx.whereIn("alert_type", [
                 "Announcement",
-                "Announcement Mention",
+                "Announcement  Mention",
               ]);
             qx.where("alert_type", "Announcement").orWhere(
               "alert_type",
-              "Announcement Mention"
+              "Announcement  Mention"
             );
           })
         );
       } else if (yes(p.announcementMentions)) {
         addBranch((sub) =>
           sub
-            .where("alert_type", "Announcement Mention")
+            .where("alert_type", "Announcement  Mention")
             .andWhere("is_mentioned", true)
         );
       }
@@ -346,15 +426,36 @@ export class NotificationCore {
         });
       }
       if (!yes(p.announcementComments) && yes(p.commentsOnMyAnnouncements)) {
+        // Limit to raw comment events (exclude mentions here to avoid pulling unrelated threads)
         addBranch((sub) => {
-          if (typeof sub.whereIn === "function")
-            return sub.whereIn("alert_type", [
-              "Announcement Comment",
-              "Announcement Comment Mention",
-            ]);
-          sub
-            .where("alert_type", "Announcement Comment")
-            .orWhere("alert_type", "Announcement Comment Mention");
+          sub.where("alert_type", "Announcement Comment");
+          // Ownership constraints: comments on my announcements OR replies to my comments
+          const owned = this._ownedIds || {};
+          const myAnn = Array.isArray(owned.myAnnouncementIds) ? owned.myAnnouncementIds : [];
+          const myCom = Array.isArray(owned.myCommentIds) ? owned.myCommentIds : [];
+          sub.andWhere((qx) => {
+            const addWhereIn = (builder, field, values) => {
+              if (typeof builder.whereIn === "function") return builder.whereIn(field, values);
+              values.forEach((v, i) => {
+                if (i === 0) builder.where(field, v);
+                else builder.orWhere(field, v);
+              });
+            };
+            let applied = false;
+            if (myAnn.length) {
+              addWhereIn(qx, "parent_announcement_id", myAnn);
+              applied = true;
+            }
+            if (myCom.length) {
+              const add = (b) => addWhereIn(b, "parent_comment_id", myCom);
+              if (applied) qx.orWhere((b) => add(b));
+              else add(qx);
+              applied = true;
+            }
+            if (!applied) {
+              try { qx.where("id", -1); } catch (_) {}
+            }
+          });
         });
       }
 
@@ -536,6 +637,23 @@ export class NotificationCore {
       return Promise.resolve();
     }
     this.classIds = [];
+    // Prefetch ownership sets when needed for filters
+    const p = userConfig.preferences || {};
+    const yes = (v) => String(v).trim().toLowerCase() === "yes";
+    const needOwned = !yes(p.announcementComments) && yes(p.commentsOnMyAnnouncements);
+    if (needOwned) {
+      try {
+        const [myAnnouncementIds, myCommentIds] = await Promise.all([
+          this.fetchMyAnnouncementIds(),
+          this.fetchMyCommentIds(),
+        ]);
+        this._ownedIds = { myAnnouncementIds, myCommentIds };
+      } catch (_) {
+        this._ownedIds = { myAnnouncementIds: [], myCommentIds: [] };
+      }
+    } else {
+      this._ownedIds = { myAnnouncementIds: [], myCommentIds: [] };
+    }
     this.query = this.buildQuery([]);
     if (
       userConfig?.debug?.notifications &&
@@ -639,4 +757,3 @@ export class NotificationCore {
     }
   }
 }
-

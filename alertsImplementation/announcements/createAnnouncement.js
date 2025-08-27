@@ -336,7 +336,7 @@ document
                     const teacherCanonical = (window.AWC && typeof window.AWC.buildAlertUrl === 'function') ? window.AWC.buildAlertUrl('teacher', 'announcement', params) : undefined;
                     const adminCanonical = (window.AWC && typeof window.AWC.buildAlertUrl === 'function') ? window.AWC.buildAlertUrl('admin', 'announcement', params) : undefined;
                     return {
-                        alert_type: isMentioned ? 'Announcement Mention' : 'Announcement',
+                        alert_type: isMentioned ? 'Announcement  Mention' : 'Announcement',
                         title: isMentioned ? 'You are mentioned in an announcement' : 'An announcement has been posted',
                         content: contentText,
                         created_at: createdAt,

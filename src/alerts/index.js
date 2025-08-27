@@ -386,7 +386,8 @@ const { slug, apiKey } = config;
         const t = c.dataset.type || "";
         const matchesTab =
           navCurrentTab === "all" ||
-          (navCurrentTab === "announcements" && t === "Announcement");
+          (navCurrentTab === "announcements" &&
+            (t === "Announcement" || t === "Announcement  Mention"));
         const shouldHide = (hideRead && !isUnread) || !matchesTab;
         c.classList.toggle("hidden", !!shouldHide);
       });
@@ -474,7 +475,8 @@ const { slug, apiKey } = config;
         const isUnread = c.classList.contains("unread");
         const matchesTab =
           bodyCurrentTab === "all" ||
-          (bodyCurrentTab === "announcements" && t === "Announcement");
+          (bodyCurrentTab === "announcements" &&
+            (t === "Announcement" || t === "Announcement  Mention"));
         const shouldHide = (hideRead && !isUnread) || !matchesTab;
         c.classList.toggle("hidden", !!shouldHide);
       });
