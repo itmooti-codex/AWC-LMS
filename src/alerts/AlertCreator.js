@@ -178,12 +178,14 @@ function buildAlertUrl(role, category, params = {}) {
   const notType = p.notType;
 
   const idForPost = (commentId || parentPostId || postId || '');
-  const idForAnnouncement = (announcementId || commentId || '');
+  // Announcements: when a comment/reply exists, prefer its ID
+  const idForAnnouncement = (commentId || announcementId || '');
   // For submissions: base event -> submissionId; comment -> commentId
   const submissionId = p.submissionId;
   // For submissions: submissionPostIs should always be the submission id;
   // scrolling is handled via commentScrollId when present.
-  const idForSubmission = (submissionId || commentId || '');
+  // Submissions: when a comment/reply exists, prefer its ID
+  const idForSubmission = (commentId || submissionId || '');
 
   // Admin/Teacher routes
   if (r === 'admin' || r === 'teachers' || r === 'teacher') {
