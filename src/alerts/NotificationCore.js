@@ -218,9 +218,20 @@ export class NotificationCore {
     if (cached?.promise) return cached.promise;
     const run = async () => {
       try {
-        const model = typeof this.plugin.switchTo === "function"
-          ? this.plugin.switchTo("calcForumPosts")
-          : this.plugin.switchToId && this.plugin.switchToId("calcForumPosts");
+        let model = null;
+        try {
+          model = typeof this.plugin.switchTo === "function"
+            ? this.plugin.switchTo("calcForumPosts")
+            : this.plugin.switchToId && this.plugin.switchToId("calcForumPosts");
+        } catch (_) { /* ignore */ }
+        if (!model || typeof model.query !== "function") {
+          try {
+            model = typeof this.plugin.switchTo === "function"
+              ? this.plugin.switchTo("getForumPosts")
+              : this.plugin.switchToId && this.plugin.switchToId("getForumPosts");
+          } catch (_) { /* ignore */ }
+        }
+        if (!model || typeof model.query !== "function") return [];
         const q = model
           .query()
           .select(["id"]) // id of post
@@ -256,9 +267,20 @@ export class NotificationCore {
     if (cached?.promise) return cached.promise;
     const run = async () => {
       try {
-        const model = typeof this.plugin.switchTo === "function"
-          ? this.plugin.switchTo("calcSubmissions")
-          : this.plugin.switchToId && this.plugin.switchToId("calcSubmissions");
+        let model = null;
+        try {
+          model = typeof this.plugin.switchTo === "function"
+            ? this.plugin.switchTo("calcSubmissions")
+            : this.plugin.switchToId && this.plugin.switchToId("calcSubmissions");
+        } catch (_) { /* ignore */ }
+        if (!model || typeof model.query !== "function") {
+          try {
+            model = typeof this.plugin.switchTo === "function"
+              ? this.plugin.switchTo("getSubmissions")
+              : this.plugin.switchToId && this.plugin.switchToId("getSubmissions");
+          } catch (_) { /* ignore */ }
+        }
+        if (!model || typeof model.query !== "function") return [];
         const q = model
           .query()
           .select(["id"]) // id of submission
@@ -482,9 +504,9 @@ export class NotificationCore {
         const owned = this._ownedIds || {};
         const myPosts = Array.isArray(owned.myPostIds) ? owned.myPostIds : [];
         const myCom = Array.isArray(owned.myCommentIds) ? owned.myCommentIds : [];
-        if (myPosts.length || myCom.length) {
-          addBranch((sub) => {
-            sub.where("alert_type", "Post Comment");
+        addBranch((sub) => {
+          sub.where("alert_type", "Post Comment");
+          if (myPosts.length || myCom.length) {
             sub.andWhere((qx) => {
               const addWhereIn = (builder, field, values) => {
                 if (typeof builder.whereIn === "function") return builder.whereIn(field, values);
@@ -504,16 +526,19 @@ export class NotificationCore {
                 else add(qx);
               }
             });
-          });
-        }
+          } else {
+            // No ownership hints available: force no results rather than overfetch
+            sub.andWhere("id", -1);
+          }
+        });
       }
       if (!yes(p.submissionComments) && yes(p.commentsOnMySubmissions)) {
         const owned = this._ownedIds || {};
         const mySubs = Array.isArray(owned.mySubmissionIds) ? owned.mySubmissionIds : [];
         const myCom = Array.isArray(owned.myCommentIds) ? owned.myCommentIds : [];
-        if (mySubs.length || myCom.length) {
-          addBranch((sub) => {
-            sub.where("alert_type", "Submission Comment");
+        addBranch((sub) => {
+          sub.where("alert_type", "Submission Comment");
+          if (mySubs.length || myCom.length) {
             sub.andWhere((qx) => {
               const addWhereIn = (builder, field, values) => {
                 if (typeof builder.whereIn === "function") return builder.whereIn(field, values);
@@ -533,17 +558,19 @@ export class NotificationCore {
                 else add(qx);
               }
             });
-          });
-        }
+          } else {
+            sub.andWhere("id", -1);
+          }
+        });
       }
       if (!yes(p.announcementComments) && yes(p.commentsOnMyAnnouncements)) {
         // Limit to raw comment events (exclude mentions here to avoid pulling unrelated threads)
         const owned = this._ownedIds || {};
         const myAnn = Array.isArray(owned.myAnnouncementIds) ? owned.myAnnouncementIds : [];
         const myCom = Array.isArray(owned.myCommentIds) ? owned.myCommentIds : [];
-        if (myAnn.length || myCom.length) {
-          addBranch((sub) => {
-            sub.where("alert_type", "Announcement Comment");
+        addBranch((sub) => {
+          sub.where("alert_type", "Announcement Comment");
+          if (myAnn.length || myCom.length) {
             // Ownership constraints: comments on my announcements OR replies to my comments
             sub.andWhere((qx) => {
               const addWhereIn = (builder, field, values) => {
@@ -564,8 +591,10 @@ export class NotificationCore {
                 else add(qx);
               }
             });
-          });
-        }
+          } else {
+            sub.andWhere("id", -1);
+          }
+        });
       }
 
       // Comment mentions are handled above with base categories; mention-only handled when base is off

@@ -198,3 +198,57 @@ Implementation tips
 
 Outcome
 - With these rules, the app fetches only the notifications the user asks for, minimizing noise and avoiding unintended results.
+
+
+subscription subscribeToAlerts($limit: IntScalar = 0, $offset: IntScalar) {
+  subscribeToAlerts(
+    query: [{where: {notified_contact_id: 78}}]
+    limit: $limit
+    offset: $offset
+    orderBy: [{path: ["created_at"], type: desc}]
+  ) {
+    id
+    alert_type
+    content
+    created_at
+    is_mentioned
+    is_read
+    notified_contact_id
+    origin_url
+    parent_announcement_id
+    parent_class_id
+    parent_comment_id
+    parent_post_id
+    parent_submission_id
+    title
+    unique_id
+    Parent_Class {
+      id
+      class_name
+      Course {
+        course_name
+      }
+    }
+  }
+}
+
+<script> 
+ const LOGGED_IN_CONTACT_ID = "78"; 
+ const user_Preference_Turn_Off_All_Notifications = "No"; 
+ const Turn_Off_All_Notifications_Time_Unix = "1753161343524"; 
+ const user_Preference_Posts = "No"; 
+ const user_Preference_Post_Comments = "No"; 
+ const user_Preference_Comments_On_My_Posts = "Yes"; 
+ const user_Preference_Submissions = "No"; 
+ const user_Preference_Submission_Comments = "No"; 
+ const user_Preference_Comments_On_My_Submissions = "No"; 
+ const user_Preference_Announcements = "No"; 
+ const user_Preference_Announcement_Comments = "No"; 
+ const user_Preference_Comments_On_My_Announcements = "No"; 
+ const user_Preference_Announcement_Mentions = "No"; 
+ const user_Preference_Announcement_Comment_Mentions = "No"; 
+ const user_Preference_Post_Mentions = "No"; 
+ const user_Preference_Post_Comment_Mentions = "No"; 
+ const user_Preference_Submission_Mentions = "No"; 
+ const user_Preference_Submission_Comment_Mentions = "No";
+ </script>
