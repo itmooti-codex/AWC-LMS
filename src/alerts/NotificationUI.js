@@ -70,19 +70,30 @@ export class NotificationUI {
         .join('') || '<div>None</div>';
       const prefs = lastQueryDebug.preferences || {};
       const prefPairs = Object.keys(prefs).map(k => `${k}: ${prefs[k]}`).join(', ');
+      const ownedCounts = lastQueryDebug.ownedCounts || {};
+      const branchesList = Array.isArray(lastQueryDebug.debugBranches) ? lastQueryDebug.debugBranches : [];
+      const branchesHtml = branchesList.map(b => `<div>• ${b}</div>`).join('') || '<div>None</div>';
       debugHtml = `
         <div class="notification-debug" style="border:1px solid #e5e7eb;border-radius:6px;padding:8px;margin:8px 0;background:#f9fafb;color:#111827;">
           <div style="font-weight:600;margin-bottom:6px;">Debug: Alerts Summary</div>
           <div style="display:flex;gap:12px;flex-wrap:wrap;font-size:12px;margin-bottom:6px;">
             <div><strong>Total</strong>: ${total ?? list.length}</div>
             <div><strong>User</strong>: ${lastQueryDebug.userId ?? ''}</div>
-            <div><strong>Classes</strong>: ${(lastQueryDebug.classIds || []).join(', ')}</div>
-            <div><strong>Branches</strong>: ${lastQueryDebug.addedAnyBranch ? 'enabled' : 'none'}</div>
+            <div><strong>Scope</strong>: ${lastQueryDebug.scope ?? ''}</div>
+            <div><strong>Limit</strong>: ${lastQueryDebug.limitApplied ?? ''}</div>
+            <div><strong>Order</strong>: ${lastQueryDebug.orderApplied ?? ''}</div>
+            <div><strong>Owned</strong>: ann=${ownedCounts.announcements||0}, posts=${ownedCounts.posts||0}, subs=${ownedCounts.submissions||0}, myCmts=${ownedCounts.myComments||0}</div>
           </div>
           <div style="margin-bottom:6px;">
             <div style="font-weight:500; margin-bottom:4px;">By Type</div>
             <div>
               ${typesHtml}
+            </div>
+          </div>
+          <div style="margin-bottom:6px;">
+            <div style="font-weight:500; margin-bottom:4px;">Branches Used</div>
+            <div style="font-size:12px; color:#374151;">
+              ${branchesHtml}
             </div>
           </div>
           <div style="font-size:12px; color:#374151; overflow:auto; white-space:nowrap;">

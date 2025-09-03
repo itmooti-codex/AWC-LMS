@@ -393,18 +393,29 @@ export class NotificationCore {
 
     // Build a grouped OR clause covering all enabled categories
     let addedAnyBranch = false;
+    const debugBranches = [];
     const addGroup = (group) => {
+      let started = false;
       const addBranch = (fn) => {
         // each branch is (A and B and C) combined via OR with other branches
         if (typeof fn === "function") {
-          group.orWhere(fn);
+          if (!started) {
+            group.where(fn);
+            started = true;
+          } else {
+            group.orWhere(fn);
+          }
           addedAnyBranch = true;
         }
+      };
+      const addLabeledBranch = (label, fn) => {
+        try { debugBranches.push(label); } catch (_) {}
+        addBranch(fn);
       };
 
       // Base types: include mentions implicitly when base is on
       if (yes(p.posts)) {
-        addBranch((sub) =>
+        addLabeledBranch("posts:base+mentions", (sub) =>
           sub.where((qx) => {
             // alert_type in ('Post','Post Mention')
             if (typeof qx.whereIn === "function")
@@ -417,13 +428,13 @@ export class NotificationCore {
         );
       } else if (yes(p.postMentions)) {
         // Only mentions when base is off
-        addBranch((sub) =>
+        addLabeledBranch("posts:mentions-only", (sub) =>
           sub.where("alert_type", "Post Mention").andWhere("is_mentioned", true)
         );
       }
 
       if (yes(p.submissions)) {
-        addBranch((sub) =>
+        addLabeledBranch("submissions:base+mentions", (sub) =>
           sub.where((qx) => {
             if (typeof qx.whereIn === "function")
               return qx.whereIn("alert_type", [
@@ -437,7 +448,7 @@ export class NotificationCore {
           })
         );
       } else if (yes(p.submissionMentions)) {
-        addBranch((sub) =>
+        addLabeledBranch("submissions:mentions-only", (sub) =>
           sub
             .where("alert_type", "Submission Mention")
             .andWhere("is_mentioned", true)
@@ -445,7 +456,7 @@ export class NotificationCore {
       }
 
       if (yes(p.announcements)) {
-        addBranch((sub) =>
+        addLabeledBranch("announcements:base+mentions", (sub) =>
           sub.where((qx) => {
             if (typeof qx.whereIn === "function")
               return qx.whereIn("alert_type", [
@@ -459,7 +470,7 @@ export class NotificationCore {
           })
         );
       } else if (yes(p.announcementMentions)) {
-        addBranch((sub) =>
+        addLabeledBranch("announcements:mentions-only", (sub) =>
           sub
             .where("alert_type", "Announcement  Mention")
             .andWhere("is_mentioned", true)
@@ -468,7 +479,7 @@ export class NotificationCore {
 
       // Comment types (all comments regardless of authorship). Base includes mentions.
       if (yes(p.postComments)) {
-        addBranch((sub) =>
+        addLabeledBranch("post-comments:base+mentions", (sub) =>
           sub.where((qx) => {
             if (typeof qx.whereIn === "function")
               return qx.whereIn("alert_type", [
@@ -482,7 +493,7 @@ export class NotificationCore {
           })
         );
       } else if (yes(p.postCommentMentions)) {
-        addBranch((sub) =>
+        addLabeledBranch("post-comments:mentions-only", (sub) =>
           sub
             .where("alert_type", "Post Comment Mention")
             .andWhere("is_mentioned", true)
@@ -490,7 +501,7 @@ export class NotificationCore {
       }
 
       if (yes(p.submissionComments)) {
-        addBranch((sub) =>
+        addLabeledBranch("submission-comments:base+mentions", (sub) =>
           sub.where((qx) => {
             if (typeof qx.whereIn === "function")
               return qx.whereIn("alert_type", [
@@ -504,7 +515,7 @@ export class NotificationCore {
           })
         );
       } else if (yes(p.submissionCommentMentions)) {
-        addBranch((sub) =>
+        addLabeledBranch("submission-comments:mentions-only", (sub) =>
           sub
             .where("alert_type", "Submission Comment Mention")
             .andWhere("is_mentioned", true)
@@ -512,7 +523,7 @@ export class NotificationCore {
       }
 
       if (yes(p.announcementComments)) {
-        addBranch((sub) =>
+        addLabeledBranch("announcement-comments:base+mentions", (sub) =>
           sub.where((qx) => {
             if (typeof qx.whereIn === "function")
               return qx.whereIn("alert_type", [
@@ -526,7 +537,7 @@ export class NotificationCore {
           })
         );
       } else if (yes(p.announcementCommentMentions)) {
-        addBranch((sub) =>
+        addLabeledBranch("announcement-comments:mentions-only", (sub) =>
           sub
             .where("alert_type", "Announcement Comment Mention")
             .andWhere("is_mentioned", true)
@@ -538,10 +549,11 @@ export class NotificationCore {
         const owned = this._ownedIds || {};
         const myPosts = Array.isArray(owned.myPostIds) ? owned.myPostIds : [];
         const myCom = Array.isArray(owned.myCommentIds) ? owned.myCommentIds : [];
-        if (myPosts.length || myCom.length) {
-          addBranch((sub) => {
-            sub.where("alert_type", "Post Comment");
-            sub.andWhere((qx) => {
+        addLabeledBranch(`my:commentsOnMyPosts:${(myPosts.length || myCom.length) ? 'ids' : 'relational'}`, (sub) => {
+          sub.where("alert_type", "Post Comment");
+          sub.andWhere((qx) => {
+            // Prefer ID lists when available; fallback to relational authorship checks
+            if (myPosts.length || myCom.length) {
               const addWhereIn = (builder, field, values) => {
                 if (typeof builder.whereIn === "function") return builder.whereIn(field, values);
                 values.forEach((v, i) => {
@@ -559,18 +571,39 @@ export class NotificationCore {
                 if (applied) qx.orWhere((b) => add(b));
                 else add(qx);
               }
-            });
+              return;
+            }
+            // Fallback: comments on my posts OR replies to my comments (relational)
+            let startedInner = false;
+            const OR = (fn) => {
+              if (!startedInner) {
+                qx.where(fn);
+                startedInner = true;
+              } else {
+                qx.orWhere(fn);
+              }
+            };
+            // Comments on my post
+            OR((b) => b.andWhere("Parent_Post", (p) => p.where("author_id", Number(uid))));
+            // Replies to my comments (anywhere)
+            OR((b) => b.andWhere("Parent_Comment", (p) => p.where("author_id", Number(uid))));
+            // Replies inside my post (defensive)
+            OR((b) =>
+              b.andWhere("Parent_Comment", (p) =>
+                p.andWhere("Forum_Post", (pp) => pp.where("author_id", Number(uid)))
+              )
+            );
           });
-        }
+        });
       }
       if (!yes(p.submissionComments) && yes(p.commentsOnMySubmissions)) {
         const owned = this._ownedIds || {};
         const mySubs = Array.isArray(owned.mySubmissionIds) ? owned.mySubmissionIds : [];
         const myCom = Array.isArray(owned.myCommentIds) ? owned.myCommentIds : [];
-        if (mySubs.length || myCom.length) {
-          addBranch((sub) => {
-            sub.where("alert_type", "Submission Comment");
-            sub.andWhere((qx) => {
+        addLabeledBranch(`my:commentsOnMySubmissions:${(mySubs.length || myCom.length) ? 'ids' : 'relational'}`, (sub) => {
+          sub.where("alert_type", "Submission Comment");
+          sub.andWhere((qx) => {
+            if (mySubs.length || myCom.length) {
               const addWhereIn = (builder, field, values) => {
                 if (typeof builder.whereIn === "function") return builder.whereIn(field, values);
                 values.forEach((v, i) => {
@@ -588,20 +621,38 @@ export class NotificationCore {
                 if (applied) qx.orWhere((b) => add(b));
                 else add(qx);
               }
-            });
+              return;
+            }
+            // Fallback relational checks
+            let startedInner = false;
+            const OR = (fn) => {
+              if (!startedInner) {
+                qx.where(fn);
+                startedInner = true;
+              } else {
+                qx.orWhere(fn);
+              }
+            };
+            // Comments on my submission (student == me)
+            OR((b) =>
+              b.andWhere("Parent_Submission", (p) =>
+                p.andWhere("Student", (s) => s.where("student_id", Number(uid)))
+              )
+            );
+            // Replies to my comments
+            OR((b) => b.andWhere("Parent_Comment", (p) => p.where("author_id", Number(uid))));
           });
-        }
+        });
       }
       if (!yes(p.announcementComments) && yes(p.commentsOnMyAnnouncements)) {
         // Limit to raw comment events (exclude mentions here to avoid pulling unrelated threads)
         const owned = this._ownedIds || {};
         const myAnn = Array.isArray(owned.myAnnouncementIds) ? owned.myAnnouncementIds : [];
         const myCom = Array.isArray(owned.myCommentIds) ? owned.myCommentIds : [];
-        if (myAnn.length || myCom.length) {
-          addBranch((sub) => {
-            sub.where("alert_type", "Announcement Comment");
-            // Ownership constraints: comments on my announcements OR replies to my comments
-            sub.andWhere((qx) => {
+        addLabeledBranch(`my:commentsOnMyAnnouncements:${(myAnn.length || myCom.length) ? 'ids' : 'relational'}`, (sub) => {
+          sub.where("alert_type", "Announcement Comment");
+          sub.andWhere((qx) => {
+            if (myAnn.length || myCom.length) {
               const addWhereIn = (builder, field, values) => {
                 if (typeof builder.whereIn === "function") return builder.whereIn(field, values);
                 values.forEach((v, i) => {
@@ -619,9 +670,30 @@ export class NotificationCore {
                 if (applied) qx.orWhere((b) => add(b));
                 else add(qx);
               }
-            });
+              return;
+            }
+            // Fallback relational checks
+            let startedInner = false;
+            const OR = (fn) => {
+              if (!startedInner) {
+                qx.where(fn);
+                startedInner = true;
+              } else {
+                qx.orWhere(fn);
+              }
+            };
+            // Comments on my announcements
+            OR((b) => b.andWhere("Parent_Announcement", (p) => p.where("instructor_id", Number(uid))));
+            // Replies to my comments
+            OR((b) => b.andWhere("Parent_Comment", (p) => p.where("author_id", Number(uid))));
+            // Replies inside my announcements
+            OR((b) =>
+              b.andWhere("Parent_Comment", (p) =>
+                p.andWhere("Parent_Announcement", (pa) => pa.where("instructor_id", Number(uid)))
+              )
+            );
           });
-        }
+        });
       }
 
       // Comment mentions are handled above with base categories; mention-only handled when base is off
@@ -633,17 +705,20 @@ export class NotificationCore {
     }
 
     // Apply ordering: latest first (created_at desc)
+    let orderApplied = null;
     try {
       let applied = false;
       if (typeof q.orderBy === "function") {
         try {
           q.orderBy("created_at", "desc");
           applied = true;
+          orderApplied = "orderBy(created_at desc)";
         } catch (_) {}
         if (!applied) {
           try {
             q.orderBy([{ path: ["created_at"], type: "desc" }]);
             applied = true;
+            orderApplied = "orderBy([{path:[created_at],type:desc}])";
           } catch (_) {}
         }
       }
@@ -651,24 +726,28 @@ export class NotificationCore {
         try {
           q.sortBy("created_at", "desc");
           applied = true;
+          orderApplied = "sortBy(created_at desc)";
         } catch (_) {}
       }
       if (!applied && typeof q.order === "function") {
         try {
           q.order("created_at", "desc");
           applied = true;
+          orderApplied = "order(created_at desc)";
         } catch (_) {}
       }
       if (!applied && typeof q.order_by === "function") {
         try {
           q.order_by("created_at", "desc");
           applied = true;
+          orderApplied = "order_by(created_at desc)";
         } catch (_) {}
       }
       if (!applied && typeof q.orderByRaw === "function") {
         try {
           q.orderByRaw("created_at desc");
           applied = true;
+          orderApplied = "orderByRaw(created_at desc)";
         } catch (_) {}
       }
     } catch (_) {
@@ -676,14 +755,32 @@ export class NotificationCore {
     }
 
     // Expose debug snapshot for later logging
+    const owned = this._ownedIds || {};
     this.lastQueryDebug = {
       userId: uid,
       classIds: [],
       preferences: { ...(userConfig.preferences || {}) },
       addedAnyBranch,
+      scope: this.scope,
+      limitApplied: this.limit,
+      orderApplied,
+      debugBranches,
+      ownedCounts: {
+        announcements: Array.isArray(owned.myAnnouncementIds) ? owned.myAnnouncementIds.length : 0,
+        posts: Array.isArray(owned.myPostIds) ? owned.myPostIds.length : 0,
+        submissions: Array.isArray(owned.mySubmissionIds) ? owned.mySubmissionIds.length : 0,
+        myComments: Array.isArray(owned.myCommentIds) ? owned.myCommentIds.length : 0,
+      },
+      ts: new Date().toISOString(),
     };
     try {
       window.__awcLastPrefs = this.lastQueryDebug.preferences;
+    } catch (_) {}
+    try {
+      if (userConfig?.debug?.notifications) {
+        // Useful for copy/paste into issue reports
+        console.log("[AWC Alerts] lastQueryDebug", JSON.parse(JSON.stringify(this.lastQueryDebug)));
+      }
     } catch (_) {}
     return q;
   }

@@ -187,6 +187,13 @@ const { slug, apiKey } = config;
         scope: "nav",
       });
       window.navNotificationCore = navCore;
+      try {
+        window.AWC ??= {};
+        window.AWC.getAlertsDebug = () => ({
+          nav: window.navNotificationCore?.lastQueryDebug,
+          body: window.bodyNotificationCore?.lastQueryDebug,
+        });
+      } catch (_) {}
       if (window.__awcNavAlertsPreRendered) {
         navCore.lastSig = window.__awcNavAlertsSig || null;
       }
@@ -223,11 +230,18 @@ const { slug, apiKey } = config;
         bodyEl.classList.add("hidden");
         const bodyCore = new NotificationCore({
           plugin,
-          limit: undefined,
+          limit: 5000,
           targetElementId: "body-notifications-list",
           scope: "body",
         });
         window.bodyNotificationCore = bodyCore;
+        try {
+          window.AWC ??= {};
+          window.AWC.getAlertsDebug = () => ({
+            nav: window.navNotificationCore?.lastQueryDebug,
+            body: window.bodyNotificationCore?.lastQueryDebug,
+          });
+        } catch (_) {}
         if (window.__awcBodyAlertsPreRendered) {
           bodyCore.lastSig = window.__awcBodyAlertsSig || null;
         }
