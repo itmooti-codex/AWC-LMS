@@ -9,6 +9,8 @@ const classIdsCache = new Map(); // key: `${userConfig.userType}:${userConfig.us
 // Cache my announcement IDs and my comment IDs to perform ownership checks
 const myAnnouncementsCache = new Map(); // key: `${userConfig.userId}` -> { value: number[], promise?: Promise<number[]> }
 const myCommentsCache = new Map(); // key: `${userConfig.userId}` -> { value: number[], promise?: Promise<number[]> }
+const myPostsCache = new Map(); // key: `${userConfig.userId}` -> { value: number[], promise?: Promise<number[]> }
+const mySubmissionsCache = new Map(); // key: `${userConfig.userId}` -> { value: number[], promise?: Promise<number[]> }
 
 export class NotificationCore {
   constructor({
@@ -208,6 +210,82 @@ export class NotificationCore {
     }
   }
 
+  async fetchMyPostIds() {
+    const uid = String(userConfig.userId);
+    if (!uid) return [];
+    const cached = myPostsCache.get(uid);
+    if (cached?.value) return cached.value;
+    if (cached?.promise) return cached.promise;
+    const run = async () => {
+      try {
+        const model = typeof this.plugin.switchTo === "function"
+          ? this.plugin.switchTo("calcForumPosts")
+          : this.plugin.switchToId && this.plugin.switchToId("calcForumPosts");
+        const q = model
+          .query()
+          .select(["id"]) // id of post
+          .where("author_id", Number(uid))
+          .limit(10000)
+          .offset(0)
+          .noDestroy();
+        const payload = await q.fetchDirect().toPromise();
+        const recs = Array.isArray(payload?.resp) ? payload.resp : [];
+        const ids = recs.map((r) => r.id).filter(Boolean);
+        return Array.from(new Set(ids));
+      } catch (_) {
+        return [];
+      }
+    };
+    const p = run();
+    myPostsCache.set(uid, { promise: p });
+    try {
+      const v = await p;
+      myPostsCache.set(uid, { value: v });
+      return v;
+    } catch (e) {
+      myPostsCache.delete(uid);
+      throw e;
+    }
+  }
+
+  async fetchMySubmissionIds() {
+    const uid = String(userConfig.userId);
+    if (!uid) return [];
+    const cached = mySubmissionsCache.get(uid);
+    if (cached?.value) return cached.value;
+    if (cached?.promise) return cached.promise;
+    const run = async () => {
+      try {
+        const model = typeof this.plugin.switchTo === "function"
+          ? this.plugin.switchTo("calcSubmissions")
+          : this.plugin.switchToId && this.plugin.switchToId("calcSubmissions");
+        const q = model
+          .query()
+          .select(["id"]) // id of submission
+          .where("student_id", Number(uid))
+          .limit(10000)
+          .offset(0)
+          .noDestroy();
+        const payload = await q.fetchDirect().toPromise();
+        const recs = Array.isArray(payload?.resp) ? payload.resp : [];
+        const ids = recs.map((r) => r.id).filter(Boolean);
+        return Array.from(new Set(ids));
+      } catch (_) {
+        return [];
+      }
+    };
+    const p = run();
+    mySubmissionsCache.set(uid, { promise: p });
+    try {
+      const v = await p;
+      mySubmissionsCache.set(uid, { value: v });
+      return v;
+    } catch (e) {
+      mySubmissionsCache.delete(uid);
+      throw e;
+    }
+  }
+
   buildQuery(classIds = []) {
     const q = this.alertsModel
       .query()
@@ -401,29 +479,62 @@ export class NotificationCore {
 
       // Comments on my entities (authorship checks)
       if (!yes(p.postComments) && yes(p.commentsOnMyPosts)) {
-        // Fallback: include post comment types when "my" is on but base is off
-        addBranch((sub) => {
-          if (typeof sub.whereIn === "function")
-            return sub.whereIn("alert_type", [
-              "Post Comment",
-              "Post Comment Mention",
-            ]);
-          sub
-            .where("alert_type", "Post Comment")
-            .orWhere("alert_type", "Post Comment Mention");
-        });
+        const owned = this._ownedIds || {};
+        const myPosts = Array.isArray(owned.myPostIds) ? owned.myPostIds : [];
+        const myCom = Array.isArray(owned.myCommentIds) ? owned.myCommentIds : [];
+        if (myPosts.length || myCom.length) {
+          addBranch((sub) => {
+            sub.where("alert_type", "Post Comment");
+            sub.andWhere((qx) => {
+              const addWhereIn = (builder, field, values) => {
+                if (typeof builder.whereIn === "function") return builder.whereIn(field, values);
+                values.forEach((v, i) => {
+                  if (i === 0) builder.where(field, v);
+                  else builder.orWhere(field, v);
+                });
+              };
+              let applied = false;
+              if (myPosts.length) {
+                addWhereIn(qx, "parent_post_id", myPosts);
+                applied = true;
+              }
+              if (myCom.length) {
+                const add = (b) => addWhereIn(b, "parent_comment_id", myCom);
+                if (applied) qx.orWhere((b) => add(b));
+                else add(qx);
+              }
+            });
+          });
+        }
       }
       if (!yes(p.submissionComments) && yes(p.commentsOnMySubmissions)) {
-        addBranch((sub) => {
-          if (typeof sub.whereIn === "function")
-            return sub.whereIn("alert_type", [
-              "Submission Comment",
-              "Submission Comment Mention",
-            ]);
-          sub
-            .where("alert_type", "Submission Comment")
-            .orWhere("alert_type", "Submission Comment Mention");
-        });
+        const owned = this._ownedIds || {};
+        const mySubs = Array.isArray(owned.mySubmissionIds) ? owned.mySubmissionIds : [];
+        const myCom = Array.isArray(owned.myCommentIds) ? owned.myCommentIds : [];
+        if (mySubs.length || myCom.length) {
+          addBranch((sub) => {
+            sub.where("alert_type", "Submission Comment");
+            sub.andWhere((qx) => {
+              const addWhereIn = (builder, field, values) => {
+                if (typeof builder.whereIn === "function") return builder.whereIn(field, values);
+                values.forEach((v, i) => {
+                  if (i === 0) builder.where(field, v);
+                  else builder.orWhere(field, v);
+                });
+              };
+              let applied = false;
+              if (mySubs.length) {
+                addWhereIn(qx, "parent_submission_id", mySubs);
+                applied = true;
+              }
+              if (myCom.length) {
+                const add = (b) => addWhereIn(b, "parent_comment_id", myCom);
+                if (applied) qx.orWhere((b) => add(b));
+                else add(qx);
+              }
+            });
+          });
+        }
       }
       if (!yes(p.announcementComments) && yes(p.commentsOnMyAnnouncements)) {
         // Limit to raw comment events (exclude mentions here to avoid pulling unrelated threads)
@@ -638,19 +749,20 @@ export class NotificationCore {
     // Prefetch ownership sets when needed for filters
     const p = userConfig.preferences || {};
     const yes = (v) => String(v).trim().toLowerCase() === "yes";
-    const needOwned = !yes(p.announcementComments) && yes(p.commentsOnMyAnnouncements);
-    if (needOwned) {
-      try {
-        const [myAnnouncementIds, myCommentIds] = await Promise.all([
-          this.fetchMyAnnouncementIds(),
-          this.fetchMyCommentIds(),
-        ]);
-        this._ownedIds = { myAnnouncementIds, myCommentIds };
-      } catch (_) {
-        this._ownedIds = { myAnnouncementIds: [], myCommentIds: [] };
-      }
-    } else {
-      this._ownedIds = { myAnnouncementIds: [], myCommentIds: [] };
+    const needOwnedAnnouncements = !yes(p.announcementComments) && yes(p.commentsOnMyAnnouncements);
+    const needOwnedPosts = !yes(p.postComments) && yes(p.commentsOnMyPosts);
+    const needOwnedSubmissions = !yes(p.submissionComments) && yes(p.commentsOnMySubmissions);
+    const needMyComments = needOwnedAnnouncements || needOwnedPosts || needOwnedSubmissions;
+    try {
+      const [myAnnouncementIds, myPostIds, mySubmissionIds, myCommentIds] = await Promise.all([
+        needOwnedAnnouncements ? this.fetchMyAnnouncementIds() : Promise.resolve([]),
+        needOwnedPosts ? this.fetchMyPostIds() : Promise.resolve([]),
+        needOwnedSubmissions ? this.fetchMySubmissionIds() : Promise.resolve([]),
+        needMyComments ? this.fetchMyCommentIds() : Promise.resolve([]),
+      ]);
+      this._ownedIds = { myAnnouncementIds, myPostIds, mySubmissionIds, myCommentIds };
+    } catch (_) {
+      this._ownedIds = { myAnnouncementIds: [], myPostIds: [], mySubmissionIds: [], myCommentIds: [] };
     }
     this.query = this.buildQuery([]);
     if (
