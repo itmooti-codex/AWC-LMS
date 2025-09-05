@@ -189,13 +189,14 @@ function buildAlertUrl(role, category, params = {}) {
 
   // Admin/Teacher routes
   if (r === 'admin' || r === 'teachers' || r === 'teacher') {
-    // Per requirement: teacher and admin use the SAME URL format for announcements,
-    // and values are stored into separate fields (origin_url_teacher, origin_url_admin)
+    // Teacher and admin use similar URL formats for announcements,
+    // but path segment must reflect role (admin|teacher).
     if (c === 'announcement') {
       // Use class unique_id in path (not numeric id)
       const classIdentifier = classUid; // required unique id
       const templateId = (commentId != null && Number(commentId) > 0) ? commentId : idForAnnouncement;
-      return `${BASE}/admin/class/${encodeURIComponent(classIdentifier || '')}?selectedTab=announcements?data-announcement-template-id=${templateId || ''}`;
+      const roleSeg = (r === 'admin') ? 'admin' : 'teacher';
+      return `${BASE}/${roleSeg}/class/${encodeURIComponent(classIdentifier || '')}?selectedTab=announcements?data-announcement-template-id=${templateId || ''}`;
     }
     if (c === 'post') {
       // Preserve previous behavior for posts
