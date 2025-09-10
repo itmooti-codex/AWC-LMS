@@ -390,34 +390,6 @@ export class NotificationCore {
     // Use preferences as-is. Toggling handled on page.
     const p = userConfig.preferences || {};
     const yes = (v) => String(v).trim().toLowerCase() === "yes";
-    const userTypeStr = String(userConfig.userType || "").toLowerCase();
-    const isStudent = userTypeStr === "student" || userTypeStr === "students";
-    const uidNum = Number(userConfig.userId);
-
-    // Guard: for students, hide activity inside private submissions unless it's their own
-    // Applies to: Submission, Submission Mention, Submission Comment, Submission Comment Mention
-    const applyPrivateSubmissionGuard = (builder) => {
-      if (!isStudent) return; // teachers/admin unaffected
-      try {
-        builder.andWhere((gate) => {
-          // Allow when Parent_Submission.Assessment.private_submission == false
-          gate.where((b) =>
-            b.andWhere("Parent_Submission", (ps) =>
-              ps.andWhere("Assessment", (a) => a.where("private_submission", false))
-            )
-          );
-          // Or allow when the submission belongs to me (Student.student_id == me)
-          gate.orWhere((b) =>
-            b.andWhere("Parent_Submission", (ps) =>
-              ps.andWhere("Student", (s) => s.where("student_id", uidNum))
-            )
-          );
-        });
-        debugBranches.push("guard:private-submissions:student");
-      } catch (_) {
-        // Best-effort; if relation builders unavailable, silently skip
-      }
-    };
 
     // Build a grouped OR clause covering all enabled categories
     let addedAnyBranch = false;
@@ -462,7 +434,7 @@ export class NotificationCore {
       }
 
       if (yes(p.submissions)) {
-        addLabeledBranch("submissions:base+mentions", (sub) => {
+        addLabeledBranch("submissions:base+mentions", (sub) =>
           sub.where((qx) => {
             if (typeof qx.whereIn === "function")
               return qx.whereIn("alert_type", [
@@ -473,16 +445,14 @@ export class NotificationCore {
               "alert_type",
               "Submission Mention"
             );
-          });
-          applyPrivateSubmissionGuard(sub);
-        });
+          })
+        );
       } else if (yes(p.submissionMentions)) {
-        addLabeledBranch("submissions:mentions-only", (sub) => {
+        addLabeledBranch("submissions:mentions-only", (sub) =>
           sub
             .where("alert_type", "Submission Mention")
-            .andWhere("is_mentioned", true);
-          applyPrivateSubmissionGuard(sub);
-        });
+            .andWhere("is_mentioned", true)
+        );
       }
 
       if (yes(p.announcements)) {
@@ -531,7 +501,7 @@ export class NotificationCore {
       }
 
       if (yes(p.submissionComments)) {
-        addLabeledBranch("submission-comments:base+mentions", (sub) => {
+        addLabeledBranch("submission-comments:base+mentions", (sub) =>
           sub.where((qx) => {
             if (typeof qx.whereIn === "function")
               return qx.whereIn("alert_type", [
@@ -542,16 +512,14 @@ export class NotificationCore {
               "alert_type",
               "Submission Comment Mention"
             );
-          });
-          applyPrivateSubmissionGuard(sub);
-        });
+          })
+        );
       } else if (yes(p.submissionCommentMentions)) {
-        addLabeledBranch("submission-comments:mentions-only", (sub) => {
+        addLabeledBranch("submission-comments:mentions-only", (sub) =>
           sub
             .where("alert_type", "Submission Comment Mention")
-            .andWhere("is_mentioned", true);
-          applyPrivateSubmissionGuard(sub);
-        });
+            .andWhere("is_mentioned", true)
+        );
       }
 
       if (yes(p.announcementComments)) {
