@@ -777,6 +777,9 @@
                     commentScrollID: window.commentScrollIDFromPage || "",
                     notType: "Submissions",
                   };
+                  const readyParams = (window.AWC && typeof window.AWC.waitForAlertParams === 'function')
+                    ? await window.AWC.waitForAlertParams('submission', params)
+                    : params;
                   try {
                     console.log("[SubmissionAlerts] Recipient params", {
                       contactId,
@@ -786,26 +789,26 @@
                       url:
                         window.AWC &&
                         typeof window.AWC.buildAlertUrl === "function"
-                          ? window.AWC.buildAlertUrl(role, "submission", params)
+                          ? window.AWC.buildAlertUrl(role, "submission", readyParams)
                           : "(AWC missing)",
-                    });
+                  });
                   } catch (_) {}
                   const originCanonical =
                     window.AWC && typeof window.AWC.buildAlertUrl === "function"
-                      ? window.AWC.buildAlertUrl(role, "submission", params)
-                      : buildSubmissionAlertUrl(role, params);
+                      ? window.AWC.buildAlertUrl(role, "submission", readyParams)
+                      : buildSubmissionAlertUrl(role, readyParams);
                   const teacherCanonical =
                     window.AWC && typeof window.AWC.buildAlertUrl === "function"
                       ? window.AWC.buildAlertUrl(
                           "teacher",
                           "submission",
-                          params
+                          readyParams
                         )
-                      : buildSubmissionAlertUrl("teacher", params);
+                      : buildSubmissionAlertUrl("teacher", readyParams);
                   const adminCanonical =
                     window.AWC && typeof window.AWC.buildAlertUrl === "function"
-                      ? window.AWC.buildAlertUrl("admin", "submission", params)
-                      : buildSubmissionAlertUrl("admin", params);
+                      ? window.AWC.buildAlertUrl("admin", "submission", readyParams)
+                      : buildSubmissionAlertUrl("admin", readyParams);
                   const title = isMentioned
                     ? "You have been mentioned in a submission"
                     : "A submission has been posted";

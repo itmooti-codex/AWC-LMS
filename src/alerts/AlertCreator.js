@@ -152,6 +152,40 @@ window.AWC.createAlert = createAlert;
 window.AWC.createAlerts = createAlerts;
 window.AWC.buildAlertPayload = buildAlertPayload;
 
+// Wait for required URL params to be available (best-effort)
+async function waitForAlertParams(category, params = {}, opts = {}) {
+  const c = String(category || '').toLowerCase();
+  const p = { ...(params || {}) };
+  const {
+    waitMs = 2000,
+    intervalMs = 150,
+  } = opts || {};
+  const deadline = Date.now() + Math.max(0, Number(waitMs) || 0);
+  const step = Math.max(50, Number(intervalMs) || 50);
+
+  // Helper: pick first truthy
+  const coalesce = (...vals) => vals.find(v => !!v);
+
+  // If commentId exists but isComment not provided, infer it
+  if (p.commentId != null && p.isComment == null) {
+    try { p.isComment = true; } catch (_) {}
+  }
+
+  // For submissions, ensure lessonUid is populated before building URL
+  if (c === 'submission') {
+    while (Date.now() < deadline) {
+      const haveLesson = !!p.lessonUid;
+      if (haveLesson) break;
+      try {
+        p.lessonUid = coalesce(p.lessonUid, p.lessonUIDFromPage, window.lessonUIDFromPage, window.lessonUid);
+      } catch (_) {}
+      if (p.lessonUid) break;
+      await sleep(step);
+    }
+  }
+  return p;
+}
+
 // Canonical alert URL builder
 // role: 'admin' | 'teacher' | 'students'
 // category: 'post' | 'announcement' | 'submission'
@@ -278,3 +312,4 @@ function buildAlertUrl(role, category, params = {}) {
 }
 
 window.AWC.buildAlertUrl = buildAlertUrl;
+window.AWC.waitForAlertParams = waitForAlertParams;

@@ -897,6 +897,12 @@
                   commentScrollID: Number(created.id),
                   notType: "Submission Comments",
                 };
+                const readyParams2 = (window.AWC && typeof window.AWC.waitForAlertParams === 'function')
+                  ? await window.AWC.waitForAlertParams('submission', params)
+                  : params;
+                const readyParams = (window.AWC && typeof window.AWC.waitForAlertParams === 'function')
+                  ? await window.AWC.waitForAlertParams('submission', params)
+                  : params;
                 try {
                   console.log(
                     "[newFileSubmission Alerts] computed subUID",
@@ -905,16 +911,16 @@
                 } catch (_) {}
                 const originCanonical =
                   window.AWC && typeof window.AWC.buildAlertUrl === "function"
-                    ? window.AWC.buildAlertUrl(role, "submission", params)
-                    : buildSubmissionAlertUrl(role, params);
+                    ? window.AWC.buildAlertUrl(role, "submission", readyParams)
+                    : buildSubmissionAlertUrl(role, readyParams);
                 const teacherCanonical =
                   window.AWC && typeof window.AWC.buildAlertUrl === "function"
-                    ? window.AWC.buildAlertUrl("teacher", "submission", params)
-                    : buildSubmissionAlertUrl("teacher", params);
+                    ? window.AWC.buildAlertUrl("teacher", "submission", readyParams)
+                    : buildSubmissionAlertUrl("teacher", readyParams);
                 const adminCanonical =
                   window.AWC && typeof window.AWC.buildAlertUrl === "function"
-                    ? window.AWC.buildAlertUrl("admin", "submission", params)
-                    : buildSubmissionAlertUrl("admin", params);
+                    ? window.AWC.buildAlertUrl("admin", "submission", readyParams)
+                    : buildSubmissionAlertUrl("admin", readyParams);
                 const alertType = isMentioned
                   ? "Submission Comment Mention"
                   : "Submission Comment";
@@ -1412,16 +1418,16 @@
                 };
                 const originCanonical =
                   window.AWC && typeof window.AWC.buildAlertUrl === "function"
-                    ? window.AWC.buildAlertUrl(role, "submission", params)
-                    : buildSubmissionAlertUrl(role, params);
+                    ? window.AWC.buildAlertUrl(role, "submission", readyParams2)
+                    : buildSubmissionAlertUrl(role, readyParams2);
                 const teacherCanonical =
                   window.AWC && typeof window.AWC.buildAlertUrl === "function"
-                    ? window.AWC.buildAlertUrl("teacher", "submission", params)
-                    : buildSubmissionAlertUrl("teacher", params);
+                    ? window.AWC.buildAlertUrl("teacher", "submission", readyParams2)
+                    : buildSubmissionAlertUrl("teacher", readyParams2);
                 const adminCanonical =
                   window.AWC && typeof window.AWC.buildAlertUrl === "function"
-                    ? window.AWC.buildAlertUrl("admin", "submission", params)
-                    : buildSubmissionAlertUrl("admin", params);
+                    ? window.AWC.buildAlertUrl("admin", "submission", readyParams2)
+                    : buildSubmissionAlertUrl("admin", readyParams2);
                 const alertType = isMentioned
                   ? "Submission Comment Mention"
                   : "Submission Comment";
