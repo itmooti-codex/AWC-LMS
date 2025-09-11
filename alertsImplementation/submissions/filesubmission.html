@@ -313,7 +313,7 @@
         student_id
         submission_note
         Student { student_id }
-        Submission_Mentions { id has__new__notification }
+        Submission_Mentions { unique_id has__new__notification }
       }
     }
     `,
@@ -362,129 +362,144 @@
     }
   }
 
-  async function fetchMentionContacts(classId) {
-    const q = `query getClassMentions($id: AwcClassID) { getClasses(query: [{ where: { id: $id } }]) { Teacher { id display_name first_name last_name profile_image } Enrolments { Student { id display_name first_name last_name profile_image } } } }`;
-    const adminQ = `query { getContact(query: [{ where: { email: "courses@writerscentre.com.au" } }]) { id display_name profile_image } }`;
+  // async function fetchMentionContacts(classId) {
+  //   const q = `query getClassMentions($id: AwcClassID) { getClasses(query: [{ where: { id: $id } }]) { Teacher { id display_name first_name last_name profile_image } Enrolments { Student { id display_name first_name last_name profile_image } } } }`;
+  //   const adminQ = `query { getContact(query: [{ where: { email: "courses@writerscentre.com.au" } }]) { id display_name profile_image } }`;
+  //   try {
+  //     const [cls, adm] = await Promise.all([
+  //       fetch(GRAPHQL_ENDPOINTssss, {
+  //         method: "POST",
+  //         headers: { "Content-Type": "application/json", "Api-Key": apiKeyKey },
+  //         body: JSON.stringify({
+  //           query: q,
+  //           variables: { id: Number(classId) },
+  //         }),
+  //       }).then((r) => (r.ok ? r.json() : null)),
+  //       fetch(GRAPHQL_ENDPOINTssss, {
+  //         method: "POST",
+  //         headers: { "Content-Type": "application/json", "Api-Key": apiKeyKey },
+  //         body: JSON.stringify({ query: adminQ }),
+  //       }).then((r) => (r.ok ? r.json() : null)),
+  //     ]);
+  //     const data = cls?.data?.getClasses?.[0] || {};
+  //     const teacher = data?.Teacher ? [data.Teacher] : [];
+  //     const students = Array.isArray(data?.Enrolments)
+  //       ? data.Enrolments.map((e) => e.Student).filter(Boolean)
+  //       : [];
+  //     const admin = adm?.data?.getContact ? [adm.data.getContact] : [];
+  //     const all = [...teacher, ...students, ...admin].filter(Boolean);
+  //     const values = all
+  //       .map((c) => ({
+  //         key:
+  //           c.display_name ||
+  //           `${c.first_name || ""} ${c.last_name || ""}`.trim(),
+  //         value: c.id,
+  //         image: c.profile_image,
+  //       }))
+  //       .filter((v) => v.key && v.value);
+  //     try {
+  //       console.log("[FileSubmission] Mention candidates", {
+  //         classId,
+  //         count: values.length,
+  //         sample: values[0],
+  //       });
+  //     } catch (_) {}
+  //     return values;
+  //   } catch (e) {
+  //     console.error("Failed to fetch mention contacts", e);
+  //     return [];
+  //   }
+  // }
+
+  // async function initMentionsEditor() {
+  //   try {
+  //     if (typeof Tribute === "undefined") {
+  //       console.warn(
+  //         "[FileSubmission] Tribute not available, mentions disabled"
+  //       );
+  //       return;
+  //     }
+  //     const classId = await resolveClassIdFromEid();
+  //     if (!classId) return;
+  //     const values = await fetchMentionContacts(classId);
+  //     try { window.__fileSubMentionValues = (values || []).slice(); } catch(_) {}
+  //     const tribute = new Tribute({
+  //       values,
+  //       menuItemTemplate: function (item) {
+  //         if (!item || !item.original) return "";
+  //         const img = item.original.image || "";
+  //         return `<div class="cursor-pointer inline-flex items-center gap-x-1"><img src="${img}" style="object-fit:cover;height:20px;width:20px;border-radius:50%"><span>${item.original.key}</span></div>`;
+  //       },
+  //       selectTemplate: function (item) {
+  //         if (!item || !item.original) return "";
+  //         const id = item.original.value;
+  //         const key = item.original.key;
+  //         try { console.log('[FileSubmission] selectTemplate', { id, key }); } catch(_) {}
+  //         return `<span class="mention-handle label bg-[#ebf6f6] text-[#007c8a] py-[1px] px-[2px] rounded" data-mention-id="${id}">@${key}</span>`;
+  //       },
+  //     });
+  //     const editor = document.getElementById("noteForSubmission");
+  //     if (editor) {
+  //       tribute.attach(editor);
+  //       // Optional: simple placeholder
+  //       if (!editor.textContent.trim()) {
+  //         editor.innerHTML =
+  //           '<span class="placeholder text-[#586a80] text-sm"><i>Type @ to mention…</i></span>';
+  //       }
+  //       editor.addEventListener("focus", () => {
+  //         const ph = editor.querySelector(".placeholder");
+  //         if (ph) editor.innerHTML = "";
+  //       });
+  //       editor.addEventListener('tribute-replaced', (e) => {
+  //         try { console.log('[FileSubmission] tribute-replaced', { item: e?.detail?.item, html: editor.innerHTML }); } catch(_) {}
+  //       });
+  //     }
+  //   } catch (e) {
+  //     console.error("[FileSubmission] Failed to init mentions", e);
+  //   }
+  // }
+  // function gatherMentionsFromElementt(el) {
+  //   const mentionEls = el.querySelectorAll('.mention-handle[data-mention-id]');
+  //   const fromSpans = [...mentionEls]
+  //     .map((m) => {
+  //       const idStr = m.getAttribute('data-mention-id');
+  //       if (!idStr) return null;
+  //       const idNum = Number(idStr);
+  //       return Number.isFinite(idNum) ? { id: idNum, has__new__notification: true } : null;
+  //     })
+  //     .filter(Boolean);
+  //   if (fromSpans.length) return fromSpans;
+  //   try {
+  //     const text = (el && el.textContent) ? el.textContent : '';
+  //     const tokens = [...new Set((text.match(/@([^\s,@]+)/g) || []).map(t => t.replace(/^@/, '')))] || [];
+  //     const candidates = Array.isArray(window.__fileSubMentionValues) ? window.__fileSubMentionValues : [];
+  //     const mapped = tokens.map(tok => {
+  //       const lowerTok = tok.toLowerCase();
+  //       const match = candidates.find(c => String(c.key || '').toLowerCase().startsWith(lowerTok));
+  //       if (!match) return null;
+  //       return { id: Number(match.value), has__new__notification: true };
+  //     }).filter(Boolean);
+  //     if (mapped.length) {
+  //       console.warn('[FileSubmission] Fallback mention mapping used', { tokens, mapped });
+  //       return mapped;
+  //     }
+  //   } catch(_) {}
+  //   return [];
+  // }
+
+  // Mentions extractor: mirror commentSubmission.html semantics
+  function gatherMentionsFromElementt(el) {
     try {
-      const [cls, adm] = await Promise.all([
-        fetch(GRAPHQL_ENDPOINTssss, {
-          method: "POST",
-          headers: { "Content-Type": "application/json", "Api-Key": apiKeyKey },
-          body: JSON.stringify({
-            query: q,
-            variables: { id: Number(classId) },
-          }),
-        }).then((r) => (r.ok ? r.json() : null)),
-        fetch(GRAPHQL_ENDPOINTssss, {
-          method: "POST",
-          headers: { "Content-Type": "application/json", "Api-Key": apiKeyKey },
-          body: JSON.stringify({ query: adminQ }),
-        }).then((r) => (r.ok ? r.json() : null)),
-      ]);
-      const data = cls?.data?.getClasses?.[0] || {};
-      const teacher = data?.Teacher ? [data.Teacher] : [];
-      const students = Array.isArray(data?.Enrolments)
-        ? data.Enrolments.map((e) => e.Student).filter(Boolean)
-        : [];
-      const admin = adm?.data?.getContact ? [adm.data.getContact] : [];
-      const all = [...teacher, ...students, ...admin].filter(Boolean);
-      const values = all
-        .map((c) => ({
-          key:
-            c.display_name ||
-            `${c.first_name || ""} ${c.last_name || ""}`.trim(),
-          value: c.id,
-          image: c.profile_image,
-        }))
-        .filter((v) => v.key && v.value);
-      try {
-        console.log("[FileSubmission] Mention candidates", {
-          classId,
-          count: values.length,
-          sample: values[0],
-        });
-      } catch (_) {}
-      return values;
-    } catch (e) {
-      console.error("Failed to fetch mention contacts", e);
+      const html = (el && typeof el.innerHTML === 'string')
+        ? el.innerHTML
+        : (document.getElementById('noteForSubmission')?.innerHTML || '');
+      const matches = Array.from(html.matchAll(/data-mention-id=\"(.*?)\"/g));
+      return matches
+        .map((m) => ({ unique_id: m[1], has__new__notification: true }))
+        .filter((obj) => obj && obj.unique_id);
+    } catch (_) {
       return [];
     }
-  }
-
-  async function initMentionsEditor() {
-    try {
-      if (typeof Tribute === "undefined") {
-        console.warn(
-          "[FileSubmission] Tribute not available, mentions disabled"
-        );
-        return;
-      }
-      const classId = await resolveClassIdFromEid();
-      if (!classId) return;
-      const values = await fetchMentionContacts(classId);
-      try { window.__fileSubMentionValues = (values || []).slice(); } catch(_) {}
-      const tribute = new Tribute({
-        values,
-        menuItemTemplate: function (item) {
-          if (!item || !item.original) return "";
-          const img = item.original.image || "";
-          return `<div class="cursor-pointer inline-flex items-center gap-x-1"><img src="${img}" style="object-fit:cover;height:20px;width:20px;border-radius:50%"><span>${item.original.key}</span></div>`;
-        },
-        selectTemplate: function (item) {
-          if (!item || !item.original) return "";
-          const id = item.original.value;
-          const key = item.original.key;
-          try { console.log('[FileSubmission] selectTemplate', { id, key }); } catch(_) {}
-          return `<span class="mention-handle label bg-[#ebf6f6] text-[#007c8a] py-[1px] px-[2px] rounded" data-mention-id="${id}">@${key}</span>`;
-        },
-      });
-      const editor = document.getElementById("noteForSubmission");
-      if (editor) {
-        tribute.attach(editor);
-        // Optional: simple placeholder
-        if (!editor.textContent.trim()) {
-          editor.innerHTML =
-            '<span class="placeholder text-[#586a80] text-sm"><i>Type @ to mention…</i></span>';
-        }
-        editor.addEventListener("focus", () => {
-          const ph = editor.querySelector(".placeholder");
-          if (ph) editor.innerHTML = "";
-        });
-        editor.addEventListener('tribute-replaced', (e) => {
-          try { console.log('[FileSubmission] tribute-replaced', { item: e?.detail?.item, html: editor.innerHTML }); } catch(_) {}
-        });
-      }
-    } catch (e) {
-      console.error("[FileSubmission] Failed to init mentions", e);
-    }
-  }
-  function gatherMentionsFromElementt(el) {
-    const mentionEls = el.querySelectorAll('.mention-handle[data-mention-id]');
-    const fromSpans = [...mentionEls]
-      .map((m) => {
-        const idStr = m.getAttribute('data-mention-id');
-        if (!idStr) return null;
-        const idNum = Number(idStr);
-        return Number.isFinite(idNum) ? { id: idNum, has__new__notification: true } : null;
-      })
-      .filter(Boolean);
-    if (fromSpans.length) return fromSpans;
-    try {
-      const text = (el && el.textContent) ? el.textContent : '';
-      const tokens = [...new Set((text.match(/@([^\s,@]+)/g) || []).map(t => t.replace(/^@/, '')))] || [];
-      const candidates = Array.isArray(window.__fileSubMentionValues) ? window.__fileSubMentionValues : [];
-      const mapped = tokens.map(tok => {
-        const lowerTok = tok.toLowerCase();
-        const match = candidates.find(c => String(c.key || '').toLowerCase().startsWith(lowerTok));
-        if (!match) return null;
-        return { id: Number(match.value), has__new__notification: true };
-      }).filter(Boolean);
-      if (mapped.length) {
-        console.warn('[FileSubmission] Fallback mention mapping used', { tokens, mapped });
-        return mapped;
-      }
-    } catch(_) {}
-    return [];
   }
 
   document.addEventListener("DOMContentLoaded", () => {
