@@ -354,6 +354,7 @@ export class NotificationCore {
         "is_read",
         "notified_contact_id",
         "origin_url",
+        "alert_status",
         "parent_announcement_id",
         "parent_class_id",
         "parent_comment_id",
@@ -385,6 +386,8 @@ export class NotificationCore {
     if (uid !== undefined && uid !== null) {
       q.where("notified_contact_id", Number(uid));
     }
+    // Always only fetch Published alerts
+    try { q.andWhere ? q.andWhere("alert_status", "Published") : q.where("alert_status", "Published"); } catch (_) { try { q.where("alert_status", "Published"); } catch (_) {} }
 
     // Apply user preference conditions for alert types, mentions, and ownership checks
     // Use preferences as-is. Toggling handled on page.

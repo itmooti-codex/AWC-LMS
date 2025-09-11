@@ -10,6 +10,7 @@ const ALLOWED_FIELDS = new Set([
   'origin_url',
   'origin_url_teacher',
   'origin_url_admin',
+  'alert_status',
   'parent_announcement_id',
   'parent_class_id',
   'parent_comment_id',

@@ -960,21 +960,22 @@
                       alertType,
                     });
                   } catch (_) {}
-                  alerts.push({
-                    alert_type: alertType,
-                    title,
-                    content: contentText,
-                    created_at: createdAt,
-                    is_mentioned: !!isMentioned,
-                    is_read: false,
-                    notified_contact_id: Number(contactId),
-                    origin_url: originCanonical,
-                    origin_url_teacher: teacherCanonical,
-                    origin_url_admin: adminCanonical,
-                    parent_class_id: Number(clsId),
-                    parent_submission_id: Number(submissionID),
-                    parent_comment_id: Number(created.id),
-                  });
+              alerts.push({
+                alert_type: alertType,
+                title,
+                content: contentText,
+                created_at: createdAt,
+                is_mentioned: !!isMentioned,
+                is_read: false,
+                alert_status: 'Published',
+                notified_contact_id: Number(contactId),
+                origin_url: originCanonical,
+                origin_url_teacher: teacherCanonical,
+                origin_url_admin: adminCanonical,
+                parent_class_id: Number(clsId),
+                parent_submission_id: Number(submissionID),
+                parent_comment_id: Number(created.id),
+              });
                   try {
                     console.log("[newFileSubmission Alerts] URL", {
                       contactId,
@@ -1476,21 +1477,22 @@
                   } catch (_) {
                     title = "A reply has been added to a comment";
                   }
-                  alerts.push({
-                    alert_type: alertType,
-                    title,
-                    content: contentText,
-                    created_at: createdAt,
-                    is_mentioned: !!isMentioned,
-                    is_read: false,
-                    notified_contact_id: Number(contactId),
-                    origin_url: originCanonical,
-                    origin_url_teacher: teacherCanonical,
-                    origin_url_admin: adminCanonical,
-                    parent_class_id: Number(clsId),
-                    parent_submission_id: Number(submissionID),
-                    parent_comment_id: Number(created.id),
-                  });
+              alerts.push({
+                alert_type: alertType,
+                title,
+                content: contentText,
+                created_at: createdAt,
+                is_mentioned: !!isMentioned,
+                is_read: false,
+                alert_status: 'Published',
+                notified_contact_id: Number(contactId),
+                origin_url: originCanonical,
+                origin_url_teacher: teacherCanonical,
+                origin_url_admin: adminCanonical,
+                parent_class_id: Number(clsId),
+                parent_submission_id: Number(submissionID),
+                parent_comment_id: Number(created.id),
+              });
                 }
 
                 if (alerts.length) {
