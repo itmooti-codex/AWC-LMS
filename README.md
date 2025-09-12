@@ -1,61 +1,25 @@
-We have to update few things
+at the moment I have made something that works ok but is not ideal and I think you can do a much better job based on what you have learned about the SDK and also about what ou did with the SEED Northern rivers transactions API script you made.
 
-First is fetching alerts
-As the notified contact is the base condtion, we would want to add another condtion that will always remain regardless of other alerts fetch condtion and that is alert status
+HEre is the page so far for the accessories shop for an example of how I want the accessories to be able to be viewed and then added to a cart:
 
-So we only fetch those alerts with status published
-here is the query 
-query getAlerts {
-  getAlerts(
-    query: [{ where: { alert_status: "Published" } }]
-  )
-}
+https://app.thehappy.clinic/shop
 
+Then I want a proper cart process.
 
-alert status can have two values Published and Not Published.
+Simialr to what you see here:
 
-But we only fetched that are published.
+https://shop.carinapharmacy.com.au/dry-herb-vapes/dynavap
 
-Meaning when we create alerts, now we have to send alert status for each alert created to have published value by default
+https://shop.carinapharmacy.com.au/510-batteries/yocan/yocan-kodo-pro-510-battery-black?gn=Yocan&gp=1
 
-Except for one case where we create alerts for announcemnts. we need to check createAnnouncment.js
+https://shop.carinapharmacy.com.au/cart
 
-When it is scheduled type of announcement, we dont create alerts at all now. we follow exact same method for creating alerts when creating regualr announcment but for this scheduled ones, we send Not Published as alert status so, alerts do get created but now users wont be notified.
+https://shop.carinapharmacy.com.au/checkout/bc542e35-a08e-f011-a9ad-000d3ad29c49
 
-There is a catch. so if alert is scheduled but user clicks on post now before the scheduled time, the announcement is not updated using update query to update the announcement status to Published.
+The thing that I am not sure about that will likely create some complexity is how we use coupons. Ontraport allows us to create dynamic coupons related to a contact. They exist on a contact record or can be used against a product shop wide.
 
-When this happens, we need to keep track of all alerts related to this announcemnt and run update query to those alerts now to update to Published alert status
+I think you would need to create a coupon validation process like how Ontraport does it but I am not sure how to do it using the API like it is done in an Ontraport Order form. I have asked ontraport if this is possible and will await their response but in the mean time we can leave that off the process to speed up the development.
 
-When clicked on Post Now button for schedueld announement, first we need to identify the alerts of it and we cna do so by
-query calcAlerts(
-  $parent_announcement_id: AwcAnnouncementID
-) {
-  calcAlerts(
-    query: [
-      {
-        where: {
-          parent_announcement_id: $parent_announcement_id
-        }
-      }
-    ]
-  ) {
-    ID: field(arg: ["id"])
-  }
-}
+So for the phase one development this will just be for the accessories we want to sell starting with the /shop page link above. We want patients to be able to add items to their cart, update quantity and then process all with the cart they have on file and update that card on file too.
 
-
-now we have alerts and their id and we take each id and run update mutation on them to make them published with followign
-mutation updateAlerts(
-  $id: AwcAlertID
-  $payload: AlertUpdateInput = null
-) {
-  updateAlerts(
-    query: [{ where: { id: $id } }]
-    payload: $payload
-  ) {
-    alert_status
-  }
-}
-
-
-Do all of thise
+I also want this to be a system we can sell to other ontraport accounts
