@@ -181,6 +181,22 @@ async function waitForAlertParams(category, params = {}, opts = {}) {
         p.lessonUid = coalesce(p.lessonUid, p.lessonUIDFromPage, window.lessonUIDFromPage, window.lessonUid);
       } catch (_) {}
       if (p.lessonUid) break;
+      // As a fallback, try resolving via GraphQL using submissionId
+      try {
+        const sid = p.submissionId || p.parent_submission_id;
+        if (sid) {
+          // Try via Assessment -> Lesson
+          const q1 = `query getSubmissionLesson($id: AwcSubmissionID) { getSubmission(query: [{ where: { id: $id } }]) { Assessment { Lesson { unique_id } } } }`;
+          const d1 = await gqlFetch(q1, { id: Number(sid) }).catch(() => null);
+          const l1 = d1?.getSubmission?.Assessment?.Lesson?.unique_id;
+          if (l1) { p.lessonUid = l1; break; }
+          // Try direct Lesson relation if available
+          const q2 = `query getSubmissionLessonDirect($id: AwcSubmissionID) { getSubmission(query: [{ where: { id: $id } }]) { Lesson { unique_id } } }`;
+          const d2 = await gqlFetch(q2, { id: Number(sid) }).catch(() => null);
+          const l2 = d2?.getSubmission?.Lesson?.unique_id;
+          if (l2) { p.lessonUid = l2; break; }
+        }
+      } catch (_) { /* ignore */ }
       await sleep(step);
     }
   }
