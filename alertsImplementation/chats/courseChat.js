@@ -2486,14 +2486,27 @@ $(document).on("click", ".deleteFileContainerComment", function () {
 });
 
 // Helper to reset the file upload UI for a comment form
-function resetCommentFileUploadUI(form) {
-  var container = $(form).find(".commentForm");
-  container.find(".formFileInputForComment").val("");
-  container
+function resetCommentFileUploadUI(formOrContainer) {
+  // Accept either the form element itself or any descendant
+  let $root = $(formOrContainer);
+  let $container = $root.hasClass("commentForm")
+    ? $root
+    : $root.closest(".commentForm");
+  if (!$container || !$container.length) {
+    // Fallback: search within in case a higher-level wrapper was passed
+    $container = $root.find(".commentForm").first();
+  }
+  if (!$container || !$container.length) return; // nothing to reset
+
+  // Clear the file input value
+  $container.find(".formFileInputForComment").val("");
+  // Hide replace/delete controls and show attach button again
+  $container
     .find(".replaceFileContainerComment, .deleteFileContainerComment")
     .hide();
-  container.find(".attachAFileForComment").show();
-  container.find(".commentFilePreviewContainer").html("");
+  $container.find(".attachAFileForComment").show();
+  // Remove any preview markup
+  $container.find(".commentFilePreviewContainer").empty();
 }
 
 function getFilePreviewHTML(file) {
