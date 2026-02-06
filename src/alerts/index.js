@@ -192,157 +192,31 @@ const { slug, apiKey: configApiKey } = config;
       const unreadIds = unreadCards
         .map((c) => Number(c.dataset.id))
         .filter((id) => Number.isFinite(id));
-      const u = new UserConfig();
-      const uid = Number(u?.userId);
-      const hasUid = Number.isFinite(uid);
 
-      const getGraphqlConfig = () => {
-        const endpoint =
-          window.graphqlApiEndpoint ||
-          (typeof graphqlApiEndpoint !== "undefined" ? graphqlApiEndpoint : null);
-        const key =
-          window.apiAccessKey ||
-          (typeof apiAccessKey !== "undefined" ? apiAccessKey : null) ||
-          window.apiKey ||
-          (typeof apiKey !== "undefined" ? apiKey : null) ||
-          configApiKey;
-        return { endpoint, apiKey: key };
-      };
+      if (!unreadIds.length) return;
 
-      const gqlFetch = async (query, variables = {}) => {
-        try {
-          const { endpoint, apiKey } = getGraphqlConfig();
-          if (!endpoint || !apiKey) return null;
-          const res = await fetch(endpoint, {
-            method: "POST",
-            headers: { "Content-Type": "application/json", "Api-Key": apiKey },
-            body: JSON.stringify({ query, variables }),
-          });
-          if (!res.ok) return null;
-          const json = await res.json().catch(() => null);
-          if (!json || (Array.isArray(json.errors) && json.errors.length))
-            return null;
-          return json?.data || null;
-        } catch (_) {
-          return null;
-        }
-      };
+      // Use the same pattern as markAsRead for all unread alerts
+      const run = async (useId) => {
+        const mut = plugin.mutation();
+        const target = useId
+          ? mut.switchToId("ALERT")
+          : mut.switchTo("AwcAlert");
 
-      const updateAlertsViaGraphql = async (ids) => {
-        let idsToUpdate = Array.isArray(ids) ? ids.slice() : [];
-        if (!idsToUpdate.length && hasUid) {
-          const qFind = `query calcAlerts($uid: Int) { calcAlerts(query: [{ where: { notified_contact_id: $uid, is_read: false } }]) { ID: field(arg: ["id"]) } }`;
-          const data = await gqlFetch(qFind, { uid });
-          const list = Array.isArray(data?.calcAlerts) ? data.calcAlerts : [];
-          idsToUpdate = list
-            .map((r) => Number(r?.ID))
-            .filter((n) => Number.isFinite(n));
-        }
-        if (!idsToUpdate.length) return false;
-        const mut = `mutation updateAlerts($id: AwcAlertID, $payload: AlertUpdateInput = null) { updateAlerts(query: [{ where: { id: $id } }], payload: $payload) { alert_status } }`;
-        const payload = { is_read: true };
-        const chunkSize = 25;
-        for (let i = 0; i < idsToUpdate.length; i += chunkSize) {
-          const chunk = idsToUpdate.slice(i, i + chunkSize);
-          const results = await Promise.all(
-            chunk.map((id) => gqlFetch(mut, { id, payload }))
-          );
-          if (!results.some(Boolean)) return false;
-        }
-        return true;
-      };
-
-      const runBulk = async (useId) => {
-        if (!hasUid) return { ran: false, result: null };
-        try {
-          const mut = plugin.mutation();
-          const target = useId
-            ? mut.switchToId("ALERT")
-            : mut.switchTo("AwcAlert");
-          const result = await target
-            .update((q) =>
-              q
-                .where("notified_contact_id", uid)
-                .where("is_read", false)
-                .set({ is_read: true })
-            )
+        // Update all alerts with is_read = false
+        for (const id of unreadIds) {
+          await target
+            .update((q) => q.where("id", Number(id)).set({ is_read: true }))
             .execute(true)
             .toPromise();
-          return { ran: true, result };
-        } catch (err) {
-          return { ran: false, result: null };
         }
       };
 
-      const runByIds = async (useId) => {
-        if (!unreadIds.length) return { ran: false, result: null };
-        try {
-          const chunkSize = 200;
-          for (let i = 0; i < unreadIds.length; i += chunkSize) {
-            const chunk = unreadIds.slice(i, i + chunkSize);
-            const mut = plugin.mutation();
-            const target = useId
-              ? mut.switchToId("ALERT")
-              : mut.switchTo("AwcAlert");
-            await target
-              .update((q) => {
-                let qb = q;
-                if (hasUid) qb = qb.where("notified_contact_id", uid);
-                if (typeof qb.whereIn === "function") {
-                  qb = qb.whereIn("id", chunk);
-                } else {
-                  qb = qb.where("id", chunk[0]);
-                  for (let j = 1; j < chunk.length; j++) {
-                    qb = qb.orWhere("id", chunk[j]);
-                  }
-                }
-                return qb.set({ is_read: true });
-              })
-              .execute(true)
-              .toPromise();
-          }
-          return { ran: true, result: true };
-        } catch (err) {
-          return { ran: false, result: null };
-        }
-      };
-
-      let success = false;
-      let lastErr;
       try {
-        const r1 = await runBulk(true);
-        if (r1.ran && !r1.result?.isCancelling) success = true;
-      } catch (e1) {
-        lastErr = e1;
+        await run(true);
+      } catch (_) {
         try {
-          const r2 = await runBulk(false);
-          if (r2.ran && !r2.result?.isCancelling) success = true;
-        } catch (e2) {
-          lastErr = e2;
-        }
-      }
-      if (!success) {
-        try {
-          const r3 = await runByIds(true);
-          if (r3.ran && !r3.result?.isCancelling) success = true;
-        } catch (e3) {
-          lastErr = e3;
-          try {
-            const r4 = await runByIds(false);
-            if (r4.ran && !r4.result?.isCancelling) success = true;
-          } catch (e4) {
-            lastErr = e4;
-          }
-        }
-      }
-      if (!success) {
-        const gqlOk = await updateAlertsViaGraphql(unreadIds);
-        if (!gqlOk) {
-          const err =
-            lastErr ||
-            new Error(
-              "No valid SDK mutation target/execute found and GraphQL fallback failed."
-            );
+          await run(false);
+        } catch (err) {
           console.error("Mark all as read failed", err);
           return;
         }
