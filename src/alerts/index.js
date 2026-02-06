@@ -197,12 +197,12 @@ const { slug, apiKey } = config;
       const hasUid = Number.isFinite(uid);
 
       const runBulk = async (useId) => {
-        if (!hasUid) return null;
+        if (!hasUid) return { ran: false, result: null };
         const mut = plugin.mutation();
         const target = useId
           ? mut.switchToId("ALERT")
           : mut.switchTo("AwcAlert");
-        return target
+        const result = await target
           .update((q) =>
             q
               .where("notified_contact_id", uid)
@@ -211,10 +211,11 @@ const { slug, apiKey } = config;
           )
           .execute(true)
           .toPromise();
+        return { ran: true, result };
       };
 
       const runByIds = async (useId) => {
-        if (!unreadIds.length) return null;
+        if (!unreadIds.length) return { ran: false, result: null };
         const mut = plugin.mutation();
         const target = useId
           ? mut.switchToId("ALERT")
@@ -236,32 +237,33 @@ const { slug, apiKey } = config;
             return qb.set({ is_read: true });
           });
         }
-        return target.execute(true).toPromise();
+        const result = await target.execute(true).toPromise();
+        return { ran: true, result };
       };
 
       let success = false;
       let lastErr;
       try {
-        await runBulk(true);
-        success = true;
+        const r1 = await runBulk(true);
+        if (r1.ran && !r1.result?.isCancelling) success = true;
       } catch (e1) {
         lastErr = e1;
         try {
-          await runBulk(false);
-          success = true;
+          const r2 = await runBulk(false);
+          if (r2.ran && !r2.result?.isCancelling) success = true;
         } catch (e2) {
           lastErr = e2;
         }
       }
       if (!success) {
         try {
-          await runByIds(true);
-          success = true;
+          const r3 = await runByIds(true);
+          if (r3.ran && !r3.result?.isCancelling) success = true;
         } catch (e3) {
           lastErr = e3;
           try {
-            await runByIds(false);
-            success = true;
+            const r4 = await runByIds(false);
+            if (r4.ran && !r4.result?.isCancelling) success = true;
           } catch (e4) {
             lastErr = e4;
           }
