@@ -6,7 +6,7 @@ import { NotificationUtils } from "./NotificationUtils.js";
 import { UserConfig } from "../sdk/userConfig.js";
 // Removed CacheTTLs import - caching disabled for alerts
 
-const { slug, apiKey } = config;
+const { slug, apiKey: configApiKey } = config;
 
 (async function main() {
   try {
@@ -62,7 +62,7 @@ const { slug, apiKey } = config;
     }
 
     // Initialize SDK
-    const sdk = new VitalStatsSDK({ slug, apiKey });
+    const sdk = new VitalStatsSDK({ slug, apiKey: configApiKey });
     const plugin = await sdk.initialize();
     window.tempPlugin ??= plugin;
 
@@ -196,6 +196,62 @@ const { slug, apiKey } = config;
       const uid = Number(u?.userId);
       const hasUid = Number.isFinite(uid);
 
+      const getGraphqlConfig = () => {
+        const endpoint =
+          window.graphqlApiEndpoint ||
+          (typeof graphqlApiEndpoint !== "undefined" ? graphqlApiEndpoint : null);
+        const key =
+          window.apiAccessKey ||
+          (typeof apiAccessKey !== "undefined" ? apiAccessKey : null) ||
+          window.apiKey ||
+          (typeof apiKey !== "undefined" ? apiKey : null) ||
+          configApiKey;
+        return { endpoint, apiKey: key };
+      };
+
+      const gqlFetch = async (query, variables = {}) => {
+        try {
+          const { endpoint, apiKey } = getGraphqlConfig();
+          if (!endpoint || !apiKey) return null;
+          const res = await fetch(endpoint, {
+            method: "POST",
+            headers: { "Content-Type": "application/json", "Api-Key": apiKey },
+            body: JSON.stringify({ query, variables }),
+          });
+          if (!res.ok) return null;
+          const json = await res.json().catch(() => null);
+          if (!json || (Array.isArray(json.errors) && json.errors.length))
+            return null;
+          return json?.data || null;
+        } catch (_) {
+          return null;
+        }
+      };
+
+      const updateAlertsViaGraphql = async (ids) => {
+        let idsToUpdate = Array.isArray(ids) ? ids.slice() : [];
+        if (!idsToUpdate.length && hasUid) {
+          const qFind = `query calcAlerts($uid: Int) { calcAlerts(query: [{ where: { notified_contact_id: $uid, is_read: false } }]) { ID: field(arg: ["id"]) } }`;
+          const data = await gqlFetch(qFind, { uid });
+          const list = Array.isArray(data?.calcAlerts) ? data.calcAlerts : [];
+          idsToUpdate = list
+            .map((r) => Number(r?.ID))
+            .filter((n) => Number.isFinite(n));
+        }
+        if (!idsToUpdate.length) return false;
+        const mut = `mutation updateAlerts($id: AwcAlertID, $payload: AlertUpdateInput = null) { updateAlerts(query: [{ where: { id: $id } }], payload: $payload) { alert_status } }`;
+        const payload = { is_read: true };
+        const chunkSize = 25;
+        for (let i = 0; i < idsToUpdate.length; i += chunkSize) {
+          const chunk = idsToUpdate.slice(i, i + chunkSize);
+          const results = await Promise.all(
+            chunk.map((id) => gqlFetch(mut, { id, payload }))
+          );
+          if (!results.some(Boolean)) return false;
+        }
+        return true;
+      };
+
       const runBulk = async (useId) => {
         if (!hasUid) return { ran: false, result: null };
         const mut = plugin.mutation();
@@ -270,10 +326,11 @@ const { slug, apiKey } = config;
         }
       }
       if (!success) {
-        console.error("Mark all as read failed", lastErr);
-        window.navNotificationCore?.forceRefresh?.();
-        window.bodyNotificationCore?.forceRefresh?.();
-        return;
+        const gqlOk = await updateAlertsViaGraphql(unreadIds);
+        if (!gqlOk) {
+          console.error("Mark all as read failed", lastErr);
+          return;
+        }
       }
 
       // Optimistically update DOM
