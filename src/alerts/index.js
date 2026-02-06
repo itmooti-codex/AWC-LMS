@@ -255,9 +255,10 @@ const { slug, apiKey: configApiKey } = config;
       const runBulk = async (useId) => {
         if (!hasUid) return { ran: false, result: null };
         const mut = plugin.mutation();
-        const target = useId
-          ? mut.switchToId("ALERT")
-          : mut.switchTo("AwcAlert");
+        const target =
+          useId && typeof mut.switchToId === "function"
+            ? mut.switchToId("ALERT")
+            : mut.switchTo("AwcAlert");
         const result = await target
           .update((q) =>
             q
@@ -273,9 +274,10 @@ const { slug, apiKey: configApiKey } = config;
       const runByIds = async (useId) => {
         if (!unreadIds.length) return { ran: false, result: null };
         const mut = plugin.mutation();
-        const target = useId
-          ? mut.switchToId("ALERT")
-          : mut.switchTo("AwcAlert");
+        const target =
+          useId && typeof mut.switchToId === "function"
+            ? mut.switchToId("ALERT")
+            : mut.switchTo("AwcAlert");
         const chunkSize = 200;
         for (let i = 0; i < unreadIds.length; i += chunkSize) {
           const chunk = unreadIds.slice(i, i + chunkSize);
