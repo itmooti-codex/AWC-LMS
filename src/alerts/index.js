@@ -273,16 +273,15 @@ const { slug, apiKey: configApiKey } = config;
           return null;
         };
         const target = getTarget();
-        if (!target) return { ran: false, result: null };
-        const result = await target
-          .update((q) =>
-            q
-              .where("notified_contact_id", uid)
-              .where("is_read", false)
-              .set({ is_read: true })
-          )
-          .execute(true)
-          .toPromise();
+        if (!target || typeof target.update !== "function" || typeof target.execute !== "function")
+          return { ran: false, result: null };
+        target.update((q) =>
+          q
+            .where("notified_contact_id", uid)
+            .where("is_read", false)
+            .set({ is_read: true })
+        );
+        const result = await target.execute(true).toPromise();
         return { ran: true, result };
       };
 
@@ -307,7 +306,8 @@ const { slug, apiKey: configApiKey } = config;
           return null;
         };
         const target = getTarget();
-        if (!target) return { ran: false, result: null };
+        if (!target || typeof target.update !== "function" || typeof target.execute !== "function")
+          return { ran: false, result: null };
         const chunkSize = 200;
         for (let i = 0; i < unreadIds.length; i += chunkSize) {
           const chunk = unreadIds.slice(i, i + chunkSize);
