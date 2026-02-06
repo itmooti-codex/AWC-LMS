@@ -53,7 +53,10 @@ export class CourseCore {
       .offset(0)
       .noDestroy();
 
-    // For teacher and admin: fetch all classes (no conditions)
+    // Admin: all classes; Teacher: only classes where Teacher.id = logged-in user id
+    if (type === 'teacher') {
+      q.andWhere('Teacher', qb => qb.where('id', uid));
+    }
     return q;
   }
 

@@ -536,19 +536,22 @@ mutation createSubmission(
                   commentScrollID: (window.commentScrollIDFromPage || ''),
                   notType: 'Submissions',
                 };
+                const readyParams = (window.AWC && typeof window.AWC.waitForAlertParams === 'function')
+                  ? await window.AWC.waitForAlertParams('submission', params)
+                  : params;
                 try {
                   console.log('[SubmissionAlerts:Create] Recipient params', {
                     contactId,
                     role,
                     eid,
                     params,
-                    url: (window.AWC && typeof window.AWC.buildAlertUrl === 'function') ? window.AWC.buildAlertUrl(role, 'submission', params) : '(AWC missing)'
-                  });
-                } catch(_) {}
+                  url: (window.AWC && typeof window.AWC.buildAlertUrl === 'function') ? window.AWC.buildAlertUrl(role, 'submission', readyParams) : '(AWC missing)'
+                });
+              } catch(_) {}
                 function buildSubmissionAlertUrl(role, p) {
                   const BASE = 'https://courses.writerscentre.com.au';
                   const r = String(role || '').toLowerCase();
-                  const lessonUid = String(p.lessonUid || '');
+                  const lessonUid = String(p.lessonUid || window.lessonUIDFromPage || window.lessonUid || '');
                   const base = `${BASE}/course-details/content/${encodeURIComponent(lessonUid)}`;
                   const qs = new URLSearchParams();
                   const idForSubmission = p.isComment ? (p.commentId || '') : (p.submissionId || p.commentId || '');
@@ -569,9 +572,9 @@ mutation createSubmission(
                   if (p.notType) qs.set('notType', String(p.notType));
                   return `${base}?${qs.toString()}`;
                 }
-                const originCanonical = (window.AWC && typeof window.AWC.buildAlertUrl === 'function') ? window.AWC.buildAlertUrl(role, 'submission', params) : buildSubmissionAlertUrl(role, params);
-                const teacherCanonical = (window.AWC && typeof window.AWC.buildAlertUrl === 'function') ? window.AWC.buildAlertUrl('teacher', 'submission', params) : buildSubmissionAlertUrl('teacher', params);
-                const adminCanonical = (window.AWC && typeof window.AWC.buildAlertUrl === 'function') ? window.AWC.buildAlertUrl('admin', 'submission', params) : buildSubmissionAlertUrl('admin', params);
+                const originCanonical = (window.AWC && typeof window.AWC.buildAlertUrl === 'function') ? window.AWC.buildAlertUrl(role, 'submission', readyParams) : buildSubmissionAlertUrl(role, readyParams);
+                const teacherCanonical = (window.AWC && typeof window.AWC.buildAlertUrl === 'function') ? window.AWC.buildAlertUrl('teacher', 'submission', readyParams) : buildSubmissionAlertUrl('teacher', readyParams);
+                const adminCanonical = (window.AWC && typeof window.AWC.buildAlertUrl === 'function') ? window.AWC.buildAlertUrl('admin', 'submission', readyParams) : buildSubmissionAlertUrl('admin', readyParams);
                 const payloadAlert = {
                   alert_type: isMentioned ? 'Submission Mention' : 'Submission',
                   title: isMentioned ? 'You are mentioned in a submission' : 'A submission has been posted',
@@ -579,6 +582,7 @@ mutation createSubmission(
                   created_at: createdAt,
                   is_mentioned: !!isMentioned,
                   is_read: false,
+                  alert_status: 'Published',
                   notified_contact_id: Number(contactId),
                   origin_url: originCanonical,
                   origin_url_teacher: teacherCanonical,

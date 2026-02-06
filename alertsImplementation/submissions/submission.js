@@ -531,19 +531,22 @@ const handleComments = {
                                 commentScrollID: Number(created.id),
                                 notType: 'Submission Comments',
                             };
+                            const readyParams = (window.AWC && typeof window.AWC.waitForAlertParams === 'function')
+                              ? await window.AWC.waitForAlertParams('submission', params)
+                              : params;
                             try {
                                 console.log('[SubmissionAlerts:Detail-Comment] params', {
                                     contactId,
                                     role,
                                     eid,
                                     params,
-                                    origin: (window.AWC && typeof window.AWC.buildAlertUrl === 'function') ? window.AWC.buildAlertUrl(role, 'submission', params) : '(AWC missing)'
+                                    origin: (window.AWC && typeof window.AWC.buildAlertUrl === 'function') ? window.AWC.buildAlertUrl(role, 'submission', readyParams) : '(AWC missing)'
                                 });
                             } catch(_) {}
                             function buildSubmissionAlertUrl(role, p) {
                                 const BASE = 'https://courses.writerscentre.com.au';
                                 const r = String(role || '').toLowerCase();
-                                const lessonUid = String(p.lessonUid || '');
+                                const lessonUid = String(p.lessonUid || window.lessonUIDFromPage || window.lessonUid || '');
                                 const base = `${BASE}/course-details/content/${encodeURIComponent(lessonUid)}`;
                                 const qs = new URLSearchParams();
                                 const idForSubmission = p.isComment ? (p.commentId || '') : (p.submissionId || p.commentId || '');
@@ -564,9 +567,9 @@ const handleComments = {
                                 if (p.notType) qs.set('notType', String(p.notType));
                                 return `${base}?${qs.toString()}`;
                             }
-                            const originCanonical = (window.AWC && typeof window.AWC.buildAlertUrl === 'function') ? window.AWC.buildAlertUrl(role, 'submission', params) : buildSubmissionAlertUrl(role, params);
-                            const teacherCanonical = (window.AWC && typeof window.AWC.buildAlertUrl === 'function') ? window.AWC.buildAlertUrl('teacher', 'submission', params) : buildSubmissionAlertUrl('teacher', params);
-                            const adminCanonical = (window.AWC && typeof window.AWC.buildAlertUrl === 'function') ? window.AWC.buildAlertUrl('admin', 'submission', params) : buildSubmissionAlertUrl('admin', params);
+                            const originCanonical = (window.AWC && typeof window.AWC.buildAlertUrl === 'function') ? window.AWC.buildAlertUrl(role, 'submission', readyParams) : buildSubmissionAlertUrl(role, readyParams);
+                            const teacherCanonical = (window.AWC && typeof window.AWC.buildAlertUrl === 'function') ? window.AWC.buildAlertUrl('teacher', 'submission', readyParams) : buildSubmissionAlertUrl('teacher', readyParams);
+                            const adminCanonical = (window.AWC && typeof window.AWC.buildAlertUrl === 'function') ? window.AWC.buildAlertUrl('admin', 'submission', readyParams) : buildSubmissionAlertUrl('admin', readyParams);
                             const alertType = isMentioned ? 'Submission Comment Mention' : 'Submission Comment';
                             let title;
                             try {
@@ -594,6 +597,7 @@ const handleComments = {
                                 created_at: createdAt,
                                 is_mentioned: !!isMentioned,
                                 is_read: false,
+                                alert_status: 'Published',
                                 notified_contact_id: Number(contactId),
                                 origin_url: originCanonical,
                                 origin_url_teacher: teacherCanonical,
@@ -799,18 +803,21 @@ const handleComments = {
                                 commentScrollID: (window.commentScrollIDFromPage || ''),
                                 notType: 'Submission Comments',
                             };
+                            const readyParams2 = (window.AWC && typeof window.AWC.waitForAlertParams === 'function')
+                              ? await window.AWC.waitForAlertParams('submission', params)
+                              : params;
                             try {
                                 console.log('[SubmissionAlerts:Detail-Reply] params', {
                                     contactId,
                                     role,
                                     eid,
                                     params,
-                                    origin: (window.AWC && typeof window.AWC.buildAlertUrl === 'function') ? window.AWC.buildAlertUrl(role, 'submission', params) : '(AWC missing)'
+                                    origin: (window.AWC && typeof window.AWC.buildAlertUrl === 'function') ? window.AWC.buildAlertUrl(role, 'submission', readyParams2) : '(AWC missing)'
                                 });
                             } catch(_) {}
-                            const originCanonical = (window.AWC && typeof window.AWC.buildAlertUrl === 'function') ? window.AWC.buildAlertUrl(role, 'submission', params) : buildSubmissionAlertUrl(role, params);
-                            const teacherCanonical = (window.AWC && typeof window.AWC.buildAlertUrl === 'function') ? window.AWC.buildAlertUrl('teacher', 'submission', params) : buildSubmissionAlertUrl('teacher', params);
-                            const adminCanonical = (window.AWC && typeof window.AWC.buildAlertUrl === 'function') ? window.AWC.buildAlertUrl('admin', 'submission', params) : buildSubmissionAlertUrl('admin', params);
+                            const originCanonical = (window.AWC && typeof window.AWC.buildAlertUrl === 'function') ? window.AWC.buildAlertUrl(role, 'submission', readyParams2) : buildSubmissionAlertUrl(role, readyParams2);
+                            const teacherCanonical = (window.AWC && typeof window.AWC.buildAlertUrl === 'function') ? window.AWC.buildAlertUrl('teacher', 'submission', readyParams2) : buildSubmissionAlertUrl('teacher', readyParams2);
+                            const adminCanonical = (window.AWC && typeof window.AWC.buildAlertUrl === 'function') ? window.AWC.buildAlertUrl('admin', 'submission', readyParams2) : buildSubmissionAlertUrl('admin', readyParams2);
                             const alertType = isMentioned ? 'Submission Comment Mention' : 'Submission Comment';
                             let title;
                             try {
@@ -838,6 +845,7 @@ const handleComments = {
                                 created_at: createdAt,
                                 is_mentioned: !!isMentioned,
                                 is_read: false,
+                                alert_status: 'Published',
                                 notified_contact_id: Number(contactId),
                                 origin_url: originCanonical,
                                 origin_url_teacher: teacherCanonical,

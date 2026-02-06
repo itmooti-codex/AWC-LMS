@@ -10,6 +10,7 @@ const ALLOWED_FIELDS = new Set([
   'origin_url',
   'origin_url_teacher',
   'origin_url_admin',
+  'alert_status',
   'parent_announcement_id',
   'parent_class_id',
   'parent_comment_id',
@@ -152,6 +153,56 @@ window.AWC.createAlert = createAlert;
 window.AWC.createAlerts = createAlerts;
 window.AWC.buildAlertPayload = buildAlertPayload;
 
+// Wait for required URL params to be available (best-effort)
+async function waitForAlertParams(category, params = {}, opts = {}) {
+  const c = String(category || '').toLowerCase();
+  const p = { ...(params || {}) };
+  const {
+    waitMs = 2000,
+    intervalMs = 150,
+  } = opts || {};
+  const deadline = Date.now() + Math.max(0, Number(waitMs) || 0);
+  const step = Math.max(50, Number(intervalMs) || 50);
+
+  // Helper: pick first truthy
+  const coalesce = (...vals) => vals.find(v => !!v);
+
+  // If commentId exists but isComment not provided, infer it
+  if (p.commentId != null && p.isComment == null) {
+    try { p.isComment = true; } catch (_) {}
+  }
+
+  // For submissions, ensure lessonUid is populated before building URL
+  if (c === 'submission') {
+    while (Date.now() < deadline) {
+      const haveLesson = !!p.lessonUid;
+      if (haveLesson) break;
+      try {
+        p.lessonUid = coalesce(p.lessonUid, p.lessonUIDFromPage, window.lessonUIDFromPage, window.lessonUid);
+      } catch (_) {}
+      if (p.lessonUid) break;
+      // As a fallback, try resolving via GraphQL using submissionId
+      try {
+        const sid = p.submissionId || p.parent_submission_id;
+        if (sid) {
+          // Try via Assessment -> Lesson
+          const q1 = `query getSubmissionLesson($id: AwcSubmissionID) { getSubmission(query: [{ where: { id: $id } }]) { Assessment { Lesson { unique_id } } } }`;
+          const d1 = await gqlFetch(q1, { id: Number(sid) }).catch(() => null);
+          const l1 = d1?.getSubmission?.Assessment?.Lesson?.unique_id;
+          if (l1) { p.lessonUid = l1; break; }
+          // Try direct Lesson relation if available
+          const q2 = `query getSubmissionLessonDirect($id: AwcSubmissionID) { getSubmission(query: [{ where: { id: $id } }]) { Lesson { unique_id } } }`;
+          const d2 = await gqlFetch(q2, { id: Number(sid) }).catch(() => null);
+          const l2 = d2?.getSubmission?.Lesson?.unique_id;
+          if (l2) { p.lessonUid = l2; break; }
+        }
+      } catch (_) { /* ignore */ }
+      await sleep(step);
+    }
+  }
+  return p;
+}
+
 // Canonical alert URL builder
 // role: 'admin' | 'teacher' | 'students'
 // category: 'post' | 'announcement' | 'submission'
@@ -278,3 +329,4 @@ function buildAlertUrl(role, category, params = {}) {
 }
 
 window.AWC.buildAlertUrl = buildAlertUrl;
+window.AWC.waitForAlertParams = waitForAlertParams;

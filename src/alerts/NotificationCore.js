@@ -1,16 +1,10 @@
 import { NotificationUtils } from "./NotificationUtils.js";
 import { NotificationUI } from "./NotificationUI.js";
 import { UserConfig } from "../sdk/userConfig.js";
-import { CacheTTLs } from "../utils/cacheConfig.js";
+// Removed CacheTTLs import - caching disabled for alerts
 
 const userConfig = new UserConfig();
-// Cache class IDs per user to avoid duplicate network calls across instances
-const classIdsCache = new Map(); // key: `${userConfig.userType}:${userConfig.userId}` -> { value: number[], promise?: Promise<number[]> }
-// Cache my announcement IDs and my comment IDs to perform ownership checks
-const myAnnouncementsCache = new Map(); // key: `${userConfig.userId}` -> { value: number[], promise?: Promise<number[]> }
-const myCommentsCache = new Map(); // key: `${userConfig.userId}` -> { value: number[], promise?: Promise<number[]> }
-const myPostsCache = new Map(); // key: `${userConfig.userId}` -> { value: number[], promise?: Promise<number[]> }
-const mySubmissionsCache = new Map(); // key: `${userConfig.userId}` -> { value: number[], promise?: Promise<number[]> }
+// Removed all alert-related caching maps; queries run fresh each time
 
 export class NotificationCore {
   constructor({
@@ -66,43 +60,10 @@ export class NotificationCore {
     // Only fetch for students/teachers; admins do not constrain by classes
     const userType = String(userConfig.userType || "").toLowerCase();
     if (userType === "admin") return [];
-    const cacheKey = `${userType}:${userConfig.userId}`;
-    const cached = classIdsCache.get(cacheKey);
-    if (cached?.value) return cached.value;
-
-    // Try persisted cache (speeds up navbar on fresh loads)
-    try {
-      const lsKey = `awc:classIds:${cacheKey}`;
-      const raw = localStorage.getItem(lsKey);
-      if (raw) {
-        const parsed = JSON.parse(raw);
-        if (Array.isArray(parsed) && parsed.length) {
-          classIdsCache.set(cacheKey, { value: parsed });
-          // Fire-and-forget background refresh to keep it fresh
-          setTimeout(() => {
-            this.fetchClassIdsNetwork(cacheKey).catch(() => {});
-          }, 0);
-          return parsed;
-        }
-      }
-    } catch (_) {}
-
-    if (cached?.promise) return cached.promise;
-
-    const inFlight = this.fetchClassIdsNetwork(cacheKey, userType);
-
-    classIdsCache.set(cacheKey, { promise: inFlight });
-    try {
-      const value = await inFlight;
-      classIdsCache.set(cacheKey, { value });
-      return value;
-    } catch (e) {
-      classIdsCache.delete(cacheKey);
-      throw e;
-    }
+    return this.fetchClassIdsNetwork(userType);
   }
 
-  async fetchClassIdsNetwork(cacheKey, userType) {
+  async fetchClassIdsNetwork(userType) {
     const uid = Number(userConfig.userId);
     let classIds = [];
     if (userType === "teacher") {
@@ -148,18 +109,12 @@ export class NotificationCore {
         .filter(Boolean);
     }
     const uniq = Array.from(new Set(classIds));
-    try {
-      localStorage.setItem(`awc:classIds:${cacheKey}`, JSON.stringify(uniq));
-    } catch (_) {}
     return uniq;
   }
 
   async fetchMyAnnouncementIds() {
     const uid = String(userConfig.userId);
     if (!uid) return [];
-    const cached = myAnnouncementsCache.get(uid);
-    if (cached?.value) return cached.value;
-    if (cached?.promise) return cached.promise;
     const run = async () => {
       try {
         const model = typeof this.plugin.switchTo === "function"
@@ -180,24 +135,12 @@ export class NotificationCore {
         return [];
       }
     };
-    const p = run();
-    myAnnouncementsCache.set(uid, { promise: p });
-    try {
-      const v = await p;
-      myAnnouncementsCache.set(uid, { value: v });
-      return v;
-    } catch (e) {
-      myAnnouncementsCache.delete(uid);
-      throw e;
-    }
+    return run();
   }
 
   async fetchMyCommentIds() {
     const uid = String(userConfig.userId);
     if (!uid) return [];
-    const cached = myCommentsCache.get(uid);
-    if (cached?.value) return cached.value;
-    if (cached?.promise) return cached.promise;
     const run = async () => {
       try {
         const model = typeof this.plugin.switchTo === "function"
@@ -218,24 +161,12 @@ export class NotificationCore {
         return [];
       }
     };
-    const p = run();
-    myCommentsCache.set(uid, { promise: p });
-    try {
-      const v = await p;
-      myCommentsCache.set(uid, { value: v });
-      return v;
-    } catch (e) {
-      myCommentsCache.delete(uid);
-      throw e;
-    }
+    return run();
   }
 
   async fetchMyPostIds() {
     const uid = String(userConfig.userId);
     if (!uid) return [];
-    const cached = myPostsCache.get(uid);
-    if (cached?.value) return cached.value;
-    if (cached?.promise) return cached.promise;
     const run = async () => {
       try {
         let model = null;
@@ -274,24 +205,12 @@ export class NotificationCore {
         return [];
       }
     };
-    const p = run();
-    myPostsCache.set(uid, { promise: p });
-    try {
-      const v = await p;
-      myPostsCache.set(uid, { value: v });
-      return v;
-    } catch (e) {
-      myPostsCache.delete(uid);
-      throw e;
-    }
+    return run();
   }
 
   async fetchMySubmissionIds() {
     const uid = String(userConfig.userId);
     if (!uid) return [];
-    const cached = mySubmissionsCache.get(uid);
-    if (cached?.value) return cached.value;
-    if (cached?.promise) return cached.promise;
     const run = async () => {
       try {
         let model = null;
@@ -330,16 +249,7 @@ export class NotificationCore {
         return [];
       }
     };
-    const p = run();
-    mySubmissionsCache.set(uid, { promise: p });
-    try {
-      const v = await p;
-      mySubmissionsCache.set(uid, { value: v });
-      return v;
-    } catch (e) {
-      mySubmissionsCache.delete(uid);
-      throw e;
-    }
+    return run();
   }
 
   buildQuery(classIds = []) {
@@ -354,6 +264,7 @@ export class NotificationCore {
         "is_read",
         "notified_contact_id",
         "origin_url",
+        "alert_status",
         "parent_announcement_id",
         "parent_class_id",
         "parent_comment_id",
@@ -385,11 +296,41 @@ export class NotificationCore {
     if (uid !== undefined && uid !== null) {
       q.where("notified_contact_id", Number(uid));
     }
+    // Always only fetch Published alerts
+    try { q.andWhere ? q.andWhere("alert_status", "Published") : q.where("alert_status", "Published"); } catch (_) { try { q.where("alert_status", "Published"); } catch (_) {} }
 
     // Apply user preference conditions for alert types, mentions, and ownership checks
     // Use preferences as-is. Toggling handled on page.
     const p = userConfig.preferences || {};
     const yes = (v) => String(v).trim().toLowerCase() === "yes";
+    const userTypeStr = String(userConfig.userType || "").toLowerCase();
+    const isStudent = userTypeStr === "student" || userTypeStr === "students";
+    const uidNum = Number(userConfig.userId);
+
+    // Guard: for students, hide activity inside private submissions unless it's their own
+    // Applies to: Submission, Submission Mention, Submission Comment, Submission Comment Mention
+    const applyPrivateSubmissionGuard = (builder) => {
+      if (!isStudent) return; // teachers/admin unaffected
+      try {
+        builder.andWhere((gate) => {
+          // Allow when Parent_Submission.Assessment.private_submission == false
+          gate.where((b) =>
+            b.andWhere("Parent_Submission", (ps) =>
+              ps.andWhere("Assessment", (a) => a.where("private_submission", false))
+            )
+          );
+          // Or allow when the submission belongs to me (Student.student_id == me)
+          gate.orWhere((b) =>
+            b.andWhere("Parent_Submission", (ps) =>
+              ps.andWhere("Student", (s) => s.where("student_id", uidNum))
+            )
+          );
+        });
+        debugBranches.push("guard:private-submissions:student");
+      } catch (_) {
+        // Best-effort; if relation builders unavailable, silently skip
+      }
+    };
 
     // Build a grouped OR clause covering all enabled categories
     let addedAnyBranch = false;
@@ -415,17 +356,13 @@ export class NotificationCore {
 
       // Base types: include mentions implicitly when base is on
       if (yes(p.posts)) {
-        addLabeledBranch("posts:base+mentions", (sub) =>
-          sub.where((qx) => {
-            // alert_type in ('Post','Post Mention')
-            if (typeof qx.whereIn === "function")
-              return qx.whereIn("alert_type", ["Post", "Post Mention"]);
-            qx.where("alert_type", "Post").orWhere(
-              "alert_type",
-              "Post Mention"
-            );
-          })
-        );
+        addLabeledBranch("posts:base+mentions", (sub) => {
+          if (typeof sub.whereIn === "function") {
+            sub.whereIn("alert_type", ["Post", "Post Mention"]);
+          } else {
+            sub.where("alert_type", "Post").orWhere("alert_type", "Post Mention");
+          }
+        });
       } else if (yes(p.postMentions)) {
         // Only mentions when base is off
         addLabeledBranch("posts:mentions-only", (sub) =>
@@ -434,64 +371,47 @@ export class NotificationCore {
       }
 
       if (yes(p.submissions)) {
-        addLabeledBranch("submissions:base+mentions", (sub) =>
-          sub.where((qx) => {
-            if (typeof qx.whereIn === "function")
-              return qx.whereIn("alert_type", [
-                "Submission",
-                "Submission Mention",
-              ]);
-            qx.where("alert_type", "Submission").orWhere(
-              "alert_type",
-              "Submission Mention"
-            );
-          })
-        );
+        addLabeledBranch("submissions:base+mentions", (sub) => {
+          if (typeof sub.whereIn === "function") {
+            sub.whereIn("alert_type", ["Submission", "Submission Mention"]);
+          } else {
+            sub.where("alert_type", "Submission").orWhere("alert_type", "Submission Mention");
+          }
+          applyPrivateSubmissionGuard(sub);
+        });
       } else if (yes(p.submissionMentions)) {
-        addLabeledBranch("submissions:mentions-only", (sub) =>
+        addLabeledBranch("submissions:mentions-only", (sub) => {
           sub
             .where("alert_type", "Submission Mention")
-            .andWhere("is_mentioned", true)
-        );
+            .andWhere("is_mentioned", true);
+          applyPrivateSubmissionGuard(sub);
+        });
       }
 
       if (yes(p.announcements)) {
-        addLabeledBranch("announcements:base+mentions", (sub) =>
-          sub.where((qx) => {
-            if (typeof qx.whereIn === "function")
-              return qx.whereIn("alert_type", [
-                "Announcement",
-                "Announcement  Mention",
-              ]);
-            qx.where("alert_type", "Announcement").orWhere(
-              "alert_type",
-              "Announcement  Mention"
-            );
-          })
-        );
+        addLabeledBranch("announcements:base+mentions", (sub) => {
+          const types = ["Announcement", "Announcement Mention"];
+          if (typeof sub.whereIn === "function") {
+            sub.whereIn("alert_type", types);
+          } else {
+            sub.where("alert_type", types[0]).orWhere("alert_type", types[1]);
+          }
+        });
       } else if (yes(p.announcementMentions)) {
         addLabeledBranch("announcements:mentions-only", (sub) =>
-          sub
-            .where("alert_type", "Announcement  Mention")
-            .andWhere("is_mentioned", true)
+          sub.where("alert_type", "Announcement Mention").andWhere("is_mentioned", true)
         );
       }
 
       // Comment types (all comments regardless of authorship). Base includes mentions.
       if (yes(p.postComments)) {
-        addLabeledBranch("post-comments:base+mentions", (sub) =>
-          sub.where((qx) => {
-            if (typeof qx.whereIn === "function")
-              return qx.whereIn("alert_type", [
-                "Post Comment",
-                "Post Comment Mention",
-              ]);
-            qx.where("alert_type", "Post Comment").orWhere(
-              "alert_type",
-              "Post Comment Mention"
-            );
-          })
-        );
+        addLabeledBranch("post-comments:base+mentions", (sub) => {
+          if (typeof sub.whereIn === "function") {
+            sub.whereIn("alert_type", ["Post Comment", "Post Comment Mention"]);
+          } else {
+            sub.where("alert_type", "Post Comment").orWhere("alert_type", "Post Comment Mention");
+          }
+        });
       } else if (yes(p.postCommentMentions)) {
         addLabeledBranch("post-comments:mentions-only", (sub) =>
           sub
@@ -501,41 +421,31 @@ export class NotificationCore {
       }
 
       if (yes(p.submissionComments)) {
-        addLabeledBranch("submission-comments:base+mentions", (sub) =>
-          sub.where((qx) => {
-            if (typeof qx.whereIn === "function")
-              return qx.whereIn("alert_type", [
-                "Submission Comment",
-                "Submission Comment Mention",
-              ]);
-            qx.where("alert_type", "Submission Comment").orWhere(
-              "alert_type",
-              "Submission Comment Mention"
-            );
-          })
-        );
+        addLabeledBranch("submission-comments:base+mentions", (sub) => {
+          if (typeof sub.whereIn === "function") {
+            sub.whereIn("alert_type", ["Submission Comment", "Submission Comment Mention"]);
+          } else {
+            sub.where("alert_type", "Submission Comment").orWhere("alert_type", "Submission Comment Mention");
+          }
+          applyPrivateSubmissionGuard(sub);
+        });
       } else if (yes(p.submissionCommentMentions)) {
-        addLabeledBranch("submission-comments:mentions-only", (sub) =>
+        addLabeledBranch("submission-comments:mentions-only", (sub) => {
           sub
             .where("alert_type", "Submission Comment Mention")
-            .andWhere("is_mentioned", true)
-        );
+            .andWhere("is_mentioned", true);
+          applyPrivateSubmissionGuard(sub);
+        });
       }
 
       if (yes(p.announcementComments)) {
-        addLabeledBranch("announcement-comments:base+mentions", (sub) =>
-          sub.where((qx) => {
-            if (typeof qx.whereIn === "function")
-              return qx.whereIn("alert_type", [
-                "Announcement Comment",
-                "Announcement Comment Mention",
-              ]);
-            qx.where("alert_type", "Announcement Comment").orWhere(
-              "alert_type",
-              "Announcement Comment Mention"
-            );
-          })
-        );
+        addLabeledBranch("announcement-comments:base+mentions", (sub) => {
+          if (typeof sub.whereIn === "function") {
+            sub.whereIn("alert_type", ["Announcement Comment", "Announcement Comment Mention"]);
+          } else {
+            sub.where("alert_type", "Announcement Comment").orWhere("alert_type", "Announcement Comment Mention");
+          }
+        });
       } else if (yes(p.announcementCommentMentions)) {
         addLabeledBranch("announcement-comments:mentions-only", (sub) =>
           sub
@@ -820,76 +730,7 @@ export class NotificationCore {
     }
   }
 
-  cacheKey(classIds) {
-    const uid = userConfig.userId ?? "anon";
-    const type = String(userConfig.userType || "unknown").toLowerCase();
-    const pSig = this.prefsSignature();
-    const cSig = this.classSignature(classIds || this.classIds || []);
-    return `awc:alerts:v1:${this.scope}:${type}:${uid}:${pSig}:${cSig}`;
-  }
-
-  readCache(classIds) {
-    try {
-      const raw = localStorage.getItem(this.cacheKey(classIds));
-      if (!raw) return null;
-      const parsed = JSON.parse(raw);
-      if (!parsed || typeof parsed !== "object") return null;
-      const ttlMs =
-        this.scope === "nav" ? CacheTTLs.alerts.nav() : CacheTTLs.alerts.body();
-      if (!parsed.ts || Date.now() - parsed.ts > ttlMs) return null;
-      if (parsed.uid !== userConfig.userId) return null;
-      if (!Array.isArray(parsed.list)) return null;
-      return parsed.list;
-    } catch (_) {
-      return null;
-    }
-  }
-
-  writeCache(list, classIds) {
-    try {
-      const cap = this.scope === "nav" ? this.limit || 5 : 100;
-      const trimmed = Array.isArray(list) ? list.slice(0, cap) : [];
-      const sig = this.listSignature(trimmed);
-      const value = JSON.stringify({
-        ts: Date.now(),
-        uid: userConfig.userId,
-        sig,
-        list: trimmed,
-      });
-      localStorage.setItem(this.cacheKey(classIds), value);
-    } catch (_) {}
-  }
-
-  getCachedClassIdsSync() {
-    try {
-      const userType = String(userConfig.userType || "").toLowerCase();
-      const key = `awc:classIds:${userType}:${userConfig.userId}`;
-      const raw = localStorage.getItem(key);
-      if (!raw) return [];
-      const parsed = JSON.parse(raw);
-      return Array.isArray(parsed) ? parsed : [];
-    } catch (_) {
-      return [];
-    }
-  }
-
-  preRenderFromCache() {
-    const el = document.getElementById(this.targetElementId);
-    if (!el) return false;
-    // Try using known classIds first, otherwise attempt sync read of classIds cache
-    const hintClassIds = Array.isArray(this.classIds)
-      ? this.classIds
-      : this.getCachedClassIdsSync();
-    const cached = this.readCache(hintClassIds);
-    if (!cached) return false;
-    try {
-      NotificationUI.renderList(cached, el);
-      this.lastSig = this.listSignature(cached);
-      return true;
-    } catch (_) {
-      return false;
-    }
-  }
+  // Removed all localStorage-based caching helpers for alerts
 
   async start() {
     const el = document.getElementById(this.targetElementId);
@@ -955,8 +796,7 @@ export class NotificationCore {
             : raw.slice(0, this.limit);
         const recs = sliced.map(NotificationUtils.mapSdkNotificationToUi);
         const newSig = this.listSignature(recs);
-        // Persist to cache for faster warm loads
-        this.writeCache(recs, this.classIds);
+        // Caching removed: render directly
         const debugInfo = userConfig?.debug?.notifications
           ? (() => {
               const counts = raw.reduce((acc, r) => {
