@@ -252,86 +252,59 @@ const { slug, apiKey: configApiKey } = config;
         return true;
       };
 
-      const getMutationPair = (useId) => {
-        const pluginMut =
-          typeof plugin.mutation === "function" ? plugin.mutation() : null;
-        let modelMut = null;
-        if (pluginMut) {
-          if (useId && typeof pluginMut.switchToId === "function")
-            modelMut = pluginMut.switchToId("ALERT");
-          else if (typeof pluginMut.switchTo === "function")
-            modelMut = pluginMut.switchTo("AwcAlert");
-        }
-        if (!modelMut) {
-          const model =
-            useId && typeof plugin.switchToId === "function"
-              ? plugin.switchToId("ALERT")
-              : plugin.switchTo("AwcAlert");
-          if (model && typeof model.mutation === "function") {
-            modelMut = model.mutation();
-          }
-        }
-        const execMut =
-          (pluginMut && typeof pluginMut.execute === "function"
-            ? pluginMut
-            : null) ||
-          (modelMut && typeof modelMut.execute === "function" ? modelMut : null) ||
-          (modelMut?.controller &&
-          typeof modelMut.controller.execute === "function"
-            ? modelMut.controller
-            : null);
-        return { modelMut, execMut };
-      };
-
       const runBulk = async (useId) => {
         if (!hasUid) return { ran: false, result: null };
-        const { modelMut, execMut } = getMutationPair(useId);
-        if (
-          !modelMut ||
-          typeof modelMut.update !== "function" ||
-          !execMut ||
-          typeof execMut.execute !== "function"
-        )
+        try {
+          const mut = plugin.mutation();
+          const target = useId
+            ? mut.switchToId("ALERT")
+            : mut.switchTo("AwcAlert");
+          const result = await target
+            .update((q) =>
+              q
+                .where("notified_contact_id", uid)
+                .where("is_read", false)
+                .set({ is_read: true })
+            )
+            .execute(true)
+            .toPromise();
+          return { ran: true, result };
+        } catch (err) {
           return { ran: false, result: null };
-        modelMut.update((q) =>
-          q
-            .where("notified_contact_id", uid)
-            .where("is_read", false)
-            .set({ is_read: true })
-        );
-        const result = await execMut.execute(true).toPromise();
-        return { ran: true, result };
+        }
       };
 
       const runByIds = async (useId) => {
         if (!unreadIds.length) return { ran: false, result: null };
-        const { modelMut, execMut } = getMutationPair(useId);
-        if (
-          !modelMut ||
-          typeof modelMut.update !== "function" ||
-          !execMut ||
-          typeof execMut.execute !== "function"
-        )
+        try {
+          const chunkSize = 200;
+          for (let i = 0; i < unreadIds.length; i += chunkSize) {
+            const chunk = unreadIds.slice(i, i + chunkSize);
+            const mut = plugin.mutation();
+            const target = useId
+              ? mut.switchToId("ALERT")
+              : mut.switchTo("AwcAlert");
+            await target
+              .update((q) => {
+                let qb = q;
+                if (hasUid) qb = qb.where("notified_contact_id", uid);
+                if (typeof qb.whereIn === "function") {
+                  qb = qb.whereIn("id", chunk);
+                } else {
+                  qb = qb.where("id", chunk[0]);
+                  for (let j = 1; j < chunk.length; j++) {
+                    qb = qb.orWhere("id", chunk[j]);
+                  }
+                }
+                return qb.set({ is_read: true });
+              })
+              .execute(true)
+              .toPromise();
+          }
+          return { ran: true, result: true };
+        } catch (err) {
           return { ran: false, result: null };
-        const chunkSize = 200;
-        for (let i = 0; i < unreadIds.length; i += chunkSize) {
-          const chunk = unreadIds.slice(i, i + chunkSize);
-          modelMut.update((q) => {
-            let qb = q;
-            if (hasUid) qb = qb.where("notified_contact_id", uid);
-            if (typeof qb.whereIn === "function") {
-              qb = qb.whereIn("id", chunk);
-            } else {
-              qb = qb.where("id", chunk[0]);
-              for (let j = 1; j < chunk.length; j++) {
-                qb = qb.orWhere("id", chunk[j]);
-              }
-            }
-            return qb.set({ is_read: true });
-          });
         }
-        const result = await execMut.execute(true).toPromise();
-        return { ran: true, result };
       };
 
       let success = false;
