@@ -319,30 +319,96 @@ const { slug, apiKey } = config;
     }
 
     async function markAllAsRead() {
-      try {
-        const run = async (useId) => {
-          const mut = plugin.mutation();
-          const target = useId
-            ? mut.switchToId("ALERT")
-            : mut.switchTo("AwcAlert");
-          return target
-            .update((q) => q.where("is_read", false).set({ is_read: true }))
-            .execute(true)
-            .toPromise();
-        };
-        try {
-          await run(true);
-        } catch (_) {
-          await run(false);
+      const unreadCards = Array.from(
+        document.querySelectorAll(".notification-card.unread")
+      );
+      const unreadIds = unreadCards
+        .map((c) => Number(c.dataset.id))
+        .filter((id) => Number.isFinite(id));
+      const u = new UserConfig();
+      const uid = Number(u?.userId);
+      const hasUid = Number.isFinite(uid);
+
+      const runBulk = async (useId) => {
+        if (!hasUid) return null;
+        const mut = plugin.mutation();
+        const target = useId
+          ? mut.switchToId("ALERT")
+          : mut.switchTo("AwcAlert");
+        return target
+          .update((q) =>
+            q
+              .where("notified_contact_id", uid)
+              .where("is_read", false)
+              .set({ is_read: true })
+          )
+          .execute(true)
+          .toPromise();
+      };
+
+      const runByIds = async (useId) => {
+        if (!unreadIds.length) return null;
+        const mut = plugin.mutation();
+        const target = useId
+          ? mut.switchToId("ALERT")
+          : mut.switchTo("AwcAlert");
+        const chunkSize = 200;
+        for (let i = 0; i < unreadIds.length; i += chunkSize) {
+          const chunk = unreadIds.slice(i, i + chunkSize);
+          target.update((q) => {
+            let qb = q;
+            if (hasUid) qb = qb.where("notified_contact_id", uid);
+            if (typeof qb.whereIn === "function") {
+              qb = qb.whereIn("id", chunk);
+            } else {
+              qb = qb.where("id", chunk[0]);
+              for (let j = 1; j < chunk.length; j++) {
+                qb = qb.orWhere("id", chunk[j]);
+              }
+            }
+            return qb.set({ is_read: true });
+          });
         }
-        // Subscriptions will emit and update both views automatically
-      } catch (err) {
-        console.error(err);
+        return target.execute(true).toPromise();
+      };
+
+      let success = false;
+      let lastErr;
+      try {
+        await runBulk(true);
+        success = true;
+      } catch (e1) {
+        lastErr = e1;
+        try {
+          await runBulk(false);
+          success = true;
+        } catch (e2) {
+          lastErr = e2;
+        }
       }
+      if (!success) {
+        try {
+          await runByIds(true);
+          success = true;
+        } catch (e3) {
+          lastErr = e3;
+          try {
+            await runByIds(false);
+            success = true;
+          } catch (e4) {
+            lastErr = e4;
+          }
+        }
+      }
+      if (!success) {
+        console.error("Mark all as read failed", lastErr);
+        window.navNotificationCore?.forceRefresh?.();
+        window.bodyNotificationCore?.forceRefresh?.();
+        return;
+      }
+
       // Optimistically update DOM
-      document
-        .querySelectorAll(".notification-card.unread")
-        .forEach((c) => setCardReadStyles(c));
+      unreadCards.forEach((c) => setCardReadStyles(c));
       updateUnreadDot();
     }
 

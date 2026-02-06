@@ -4,39 +4,99 @@
 <script src="https://itmooti.github.io/Ontraport---AWC/globalSelectPopover.js"></script>
 
 <script>
+  function getScrollableParent(el) {
+    let p = el.parentElement;
+    while (p && p !== document.body) {
+      const style = getComputedStyle(p);
+      const canScrollY = /(auto|scroll|overlay)/.test(style.overflowY);
+      if (canScrollY && p.scrollHeight > p.clientHeight) return p;
+      p = p.parentElement;
+    }
+    return window;
+  }
+
+  function centerScroll({ scroller, target, offset = 0, smooth = true }) {
+    if (scroller === window) {
+      const rect = target.getBoundingClientRect();
+      const viewportH = window.innerHeight;
+      const y =
+        window.pageYOffset + rect.top - offset - (viewportH - rect.height) / 2;
+      window.scrollTo({
+        top: Math.max(0, y),
+        behavior: smooth ? "smooth" : "auto",
+      });
+    } else {
+      const parentRect = scroller.getBoundingClientRect();
+      const targetRect = target.getBoundingClientRect();
+      const delta =
+        targetRect.top -
+        parentRect.top -
+        (scroller.clientHeight - target.offsetHeight) / 2 -
+        offset;
+      scroller.scrollTo({
+        top: scroller.scrollTop + delta,
+        behavior: smooth ? "smooth" : "auto",
+      });
+    }
+  }
+
   function highlightAndScrollToCommentOrReply() {
     const url = window.location.href;
-    const commentScrollIdMatch = url.match(/[?&]commentScrollId=(\d+)/);
-    const commentScrollId = commentScrollIdMatch
-      ? commentScrollIdMatch[1]
-      : null;
-
+    const match = url.match(/[?&]commentScrollId=(\d+)/);
+    const commentScrollId = match ? match[1] : null;
     if (!commentScrollId) return;
 
-    const checkAndScroll = () => {
-      const targetElement =
+    // If you have a fixed header, set its height here or compute it:
+    const headerOffset =
+      document.querySelector(".site-header, header.sticky, .fixed-header")
+        ?.offsetHeight || 0;
+
+    let attempts = 0;
+    const maxAttempts = 8; // retry while layout settles
+    const intervalMs = 250;
+
+    const tryFindAndScroll = () => {
+      attempts++;
+      const target =
         document.querySelector(`[data-commentid="${commentScrollId}"]`) ||
         document.querySelector(`[data-replyid="${commentScrollId}"]`);
 
-      if (targetElement) {
-        clearInterval(pollingInterval);
-        targetElement.classList.add("highlightedSubmission");
-        const elementTop =
-          targetElement.getBoundingClientRect().top + window.pageYOffset;
-        const elementHeight = targetElement.offsetHeight;
-        const viewportHeight = window.innerHeight;
-        const scrollTop = elementTop - viewportHeight / 2 + elementHeight / 2;
-        window.scrollTo({ top: scrollTop, behavior: "smooth" });
+      if (target) {
+        target.classList.add("highlightedSubmission");
+
+        // choose scroller and center the target
+        const scroller = getScrollableParent(target);
+        centerScroll({
+          scroller,
+          target,
+          offset: scroller === window ? headerOffset : 0,
+          smooth: true,
+        });
+
+        // one extra pass after a short delay to correct for late layout shifts
+        setTimeout(() => {
+          centerScroll({
+            scroller,
+            target,
+            offset: scroller === window ? headerOffset : 0,
+            smooth: true,
+          });
+        }, 300);
+
+        clearInterval(poll);
+      } else if (attempts >= maxAttempts) {
+        clearInterval(poll);
       }
     };
 
-    const pollingInterval = setInterval(checkAndScroll, 200);
-    setTimeout(() => clearInterval(pollingInterval), 5000);
+    const poll = setInterval(tryFindAndScroll, intervalMs);
+    setTimeout(() => clearInterval(poll), maxAttempts * intervalMs + 500);
   }
 
-  document.addEventListener("DOMContentLoaded", function () {
-    highlightAndScrollToCommentOrReply();
-  });
+  document.addEventListener(
+    "DOMContentLoaded",
+    highlightAndScrollToCommentOrReply
+  );
 </script>
 
 <script>
@@ -56,7 +116,7 @@
   const commentsContainer = document.getElementById("commentsContainer");
   const commentCountElement = document.getElementById("commentCount");
   let comments = [];
-  let replies = [];
+  let replies = {};
   const submissionVoteButton = document.querySelector(".submissionVoteButton");
   const submissionVoteCountElement = document.querySelector(".voteCount");
   let submissionVoters = [];
@@ -65,13 +125,148 @@
   let commentVoters = [];
   let hasVotedForComment = false;
   let voteCountForComments = 0;
-  let globalTribute = null;
-  let mentionArrays = [];
   window.lessonUIDFromPage = "[Page//Assessment//Lesson//Unique ID]";
 
   function gatherMentionsFromElement(el) {
-    const mentionEls = el.querySelectorAll(".mention-handle[data-mention-id]");
-    return [...mentionEls].map((m) => m.getAttribute("data-mention-id"));
+    if (!el) return [];
+    const nodes = el.querySelectorAll(".mention[data-mention-id]");
+    return Array.from(nodes)
+      .map((m) => m.getAttribute("data-mention-id"))
+      .filter(Boolean);
+  }
+
+  // Ensure Tribute/@mention is attached to any dynamic editors (comments/replies)
+  function initMentionableEditor(editor) {
+    if (!editor || editor.nodeType !== 1) return;
+    try {
+      // Attach Tribute via NewMentionManager (preferred) or fallback
+      if (!editor.hasAttribute("data-tribute-attached")) {
+        if (
+          window.NewMentionManager &&
+          typeof window.NewMentionManager.initEditor === "function"
+        ) {
+          window.NewMentionManager.initEditor(editor);
+          editor.setAttribute("data-tribute-attached", "true");
+        } else if (window.Tribute) {
+          try {
+            const t = new Tribute({ trigger: "@", allowSpaces: true });
+            t.attach(editor);
+            editor.setAttribute("data-tribute-attached", "true");
+          } catch (_) {}
+        }
+      }
+
+      // Lightweight placeholder handling; guard against re-binding.
+      if (!editor.hasAttribute("data-placeholder-initialized")) {
+        const setPlaceholder = () => {
+          if (
+            !editor.textContent.trim() &&
+            !editor.querySelector(".placeholder")
+          ) {
+            editor.innerHTML =
+              '<span class="placeholder extra-small-text text-light text-[#586a80] text-base font-normal leading-normal"><i>Type @ to mention someone...</i></span>';
+          }
+        };
+        editor.addEventListener("focus", () => {
+          const ph = editor.querySelector(".placeholder");
+          if (ph) editor.innerHTML = "";
+        });
+        editor.addEventListener("blur", () => setPlaceholder());
+        setPlaceholder();
+        editor.setAttribute("data-placeholder-initialized", "true");
+      }
+    } catch (_) {}
+  }
+
+  function reInitMentionEditors(rootEl) {
+    try {
+      const root = rootEl && rootEl.querySelectorAll ? rootEl : document;
+      // No contact reload here — it's cached and loaded once.
+      const editors = root.querySelectorAll(".mentionable");
+      editors.forEach((ed) => initMentionableEditor(ed));
+    } catch (_) {}
+  }
+
+  function normalizeForumFile(rawFile, rawFileName) {
+    if (!rawFile || rawFile === "{}") return null;
+
+    const fallbackName =
+      typeof rawFileName === "string" && rawFileName.trim()
+        ? rawFileName.trim()
+        : "";
+
+    const cleanString = (value) =>
+      typeof value === "string" ? value.trim() : "";
+
+    const stripQuotes = (value) =>
+      typeof value === "string" ? value.replace(/^"|"$/g, "") : value;
+
+    const deriveNameFromLink = (linkValue) => {
+      const link = cleanString(linkValue);
+      if (!link) return "";
+      const parts = link.split("/");
+      if (!parts.length) return "";
+      const last = parts[parts.length - 1] || "";
+      try {
+        return decodeURIComponent(last);
+      } catch (_) {
+        return last;
+      }
+    };
+
+    const buildResult = (linkValue, providedName) => {
+      const cleanedLink = stripQuotes(cleanString(linkValue));
+      if (!cleanedLink) return null;
+      const hasProtocol =
+        /^https?:\/\//i.test(cleanedLink) || cleanedLink.startsWith("//");
+      if (!hasProtocol) return null;
+      const candidateName =
+        (typeof providedName === "string" && providedName.trim()) ||
+        fallbackName ||
+        deriveNameFromLink(cleanedLink) ||
+        "Download attachment";
+      return {
+        link: cleanedLink,
+        name: candidateName,
+      };
+    };
+
+    let parsedValue = rawFile;
+    if (typeof rawFile === "string") {
+      const trimmed = cleanString(rawFile);
+      if (!trimmed) return null;
+      try {
+        parsedValue = JSON.parse(trimmed);
+      } catch (_) {
+        return buildResult(trimmed, null);
+      }
+    }
+
+    if (typeof parsedValue === "string") {
+      return buildResult(parsedValue, null);
+    }
+
+    if (parsedValue && typeof parsedValue === "object") {
+      const linkValue =
+        parsedValue.link ||
+        parsedValue.url ||
+        parsedValue.href ||
+        parsedValue.Location ||
+        parsedValue.location ||
+        parsedValue.download_url ||
+        parsedValue.downloadUrl ||
+        "";
+      const builtFromObject = buildResult(linkValue, parsedValue.name);
+      if (builtFromObject) {
+        return builtFromObject;
+      }
+
+      if (parsedValue.s3_id) {
+        return buildResult(parsedValue.s3_id, parsedValue.name);
+      }
+    }
+
+    return null;
   }
 </script>
 
@@ -109,16 +304,11 @@
       const data = await API.fetchGraphQL(FETCH_SUBMISSIONS_COMMENTS_QUERY, {
         id: submissionID,
       });
-      return data.calcForumComments.map((comment) => {
-        let file = null;
-        if (comment.File && comment.File !== "{}") {
-          try {
-            file = JSON.parse(comment.File);
-            if (!file.link || !file.name) {
-              file = null;
-            }
-          } catch (error) {}
-        }
+      const normalized = (data?.calcForumComments || []).map((comment) => {
+        const file = normalizeForumFile(
+          comment.File,
+          comment.Comment_File_Name
+        );
 
         return {
           Comment: comment.Comment,
@@ -129,8 +319,22 @@
           Author_Profile_Image: comment.Author_Profile_Image,
           Date_Added: formatDateTimeFromUnix(comment.Date_Added),
           File: file,
+          Comment_File_Name:
+            typeof comment.Comment_File_Name === "string"
+              ? comment.Comment_File_Name
+              : null,
           ID: comment.ID,
+          Reply_to_Comment_ID: comment.Reply_to_Comment_ID,
         };
+      });
+
+      return normalized.filter((comment) => {
+        const parentKey =
+          comment?.Reply_to_Comment_ID !== null &&
+          comment.Reply_to_Comment_ID !== undefined
+            ? String(comment.Reply_to_Comment_ID).trim()
+            : "";
+        return !parentKey || parentKey === "0";
       });
     },
     async fetchVotersForSubmission(submissionID) {
@@ -148,112 +352,6 @@
           voteID: submission.Voters_DataID,
           voterID: submission.Voters_Contact_ID,
         }));
-    },
-    //        async fetchStudents(classId) {
-    //          const data = await API.fetchGraphQL(FETCH_STUDENTS_QUERY, { id: classId });
-    //        return data.calcEnrolments.map(student => ({
-    //          Student_First_Name: student.Student_First_Name,
-    //        Student_Last_Name: student.Student_Last_Name,
-    //    	Student_Display_Name: student.Student_Display_Name,
-    //    Student_Unique_ID: student.Student_Unique_ID,
-    //  Student_Profile_Image: student.Student_Profile_Image,
-    //}));
-    //},
-
-    async fetchMentionsData(currentClassID) {
-      const getClassQuery = `
-      query {
-        getClasses(query: [{ where: { id: ${currentClassID} } }]) {
-          Teacher {
-            first_name
-            last_name
-            display_name
-            profile_image
-            unique_id
-            id
-          }
-          Enrolments {
-            Student {
-              first_name
-              last_name
-              display_name
-              profile_image
-              unique_id
-              id
-            }
-          }
-        }
-      }
-    `;
-
-      const getAdminQuery = `
-      query {
-        getContact(query: [{ where: { email: "courses@writerscentre.com.au" } }]) {
-          Display_Name: display_name
-          Contact_ID: id
-          Profile_Image: profile_image
-          Is_Instructor: is_instructor
-          Is_Admin: is_admin
-          Email: email
-        }
-      }
-    `;
-
-      try {
-        const [classResult, adminResult] = await Promise.all([
-          API.fetchGraphQL(getClassQuery),
-          API.fetchGraphQL(getAdminQuery),
-        ]);
-
-        const classData = classResult.getClasses?.[0] || {};
-        const adminData = adminResult.getContact;
-
-        const defaultImageUrl =
-          "https://files.ontraport.com/media/b0456fe87439430680b173369cc54cea.php03bzcx?Expires=4895186056&Signature=fw-mkSjms67rj5eIsiDF9QfHb4EAe29jfz~yn3XT0--8jLdK4OGkxWBZR9YHSh26ZAp5EHj~6g5CUUncgjztHHKU9c9ymvZYfSbPO9JGht~ZJnr2Gwmp6vsvIpYvE1pEywTeoigeyClFm1dHrS7VakQk9uYac4Sw0suU4MpRGYQPFB6w3HUw-eO5TvaOLabtuSlgdyGRie6Ve0R7kzU76uXDvlhhWGMZ7alNCTdS7txSgUOT8oL9pJP832UsasK4~M~Na0ku1oY-8a7GcvvVv6j7yE0V0COB9OP0FbC8z7eSdZ8r7avFK~f9Wl0SEfS6MkPQR2YwWjr55bbJJhZnZA__&Key-Pair-Id=APKAJVAAMVW6XQYWSTNA";
-
-        const teacher = classData.Teacher
-          ? [
-              {
-                key:
-                  classData.Teacher.display_name ||
-                  `${classData.Teacher.first_name} ${classData.Teacher.last_name}`.trim(),
-                value: classData.Teacher.unique_id,
-                image: classData.Teacher.profile_image || defaultImageUrl,
-              },
-            ]
-          : [];
-
-        const students = (classData.Enrolments || []).map((e) => {
-          const s = e.Student;
-          return {
-            key: s.display_name || `${s.first_name} ${s.last_name}`.trim(),
-            value: s.unique_id,
-            image: s.profile_image || defaultImageUrl,
-          };
-        });
-
-        const admin = adminData
-          ? [
-              {
-                key: adminData.Display_Name,
-                value: adminData.Contact_ID,
-                image: adminData.Profile_Image || defaultImageUrl,
-              },
-            ]
-          : [];
-
-        console.log("admin", admin);
-        const combinedData = [...teacher, ...students, ...admin].filter(
-          (item) => item.key && item.value
-        );
-        console.log("kei", combinedData);
-        return [...teacher, ...students, ...admin].filter(
-          (item) => item.key && item.value
-        );
-      } catch (e) {
-        console.error("Failed to fetch mentions data", e);
-        return [];
-      }
     },
 
     async createVoteForSubmission(voterId, submissionID) {
@@ -356,6 +454,23 @@
         commentsContainer.innerHTML = comments
           .map((comment) => commentTemplate.render(comment))
           .join("");
+        comments.forEach((comment) => {
+          const commentId = comment && comment.ID;
+          if (commentId == null) return;
+          const key = String(commentId);
+          const cachedReplies = replies && (replies[key] || replies[commentId]);
+          if (Array.isArray(cachedReplies)) {
+            UI.updateReplies(commentId, cachedReplies);
+          }
+        });
+      }
+      // Re-attach Tribute/@mention for newly rendered reply editors (next frame)
+      try {
+        requestAnimationFrame(() => reInitMentionEditors(commentsContainer));
+      } catch (_) {
+        try {
+          setTimeout(() => reInitMentionEditors(commentsContainer), 0);
+        } catch (_) {}
       }
       UI.updateCommentCount(comments.length);
     },
@@ -365,17 +480,28 @@
       }
     },
     updateReplies(replyToCommentId, repliesForComment) {
+      const safeReplies = Array.isArray(repliesForComment)
+        ? repliesForComment
+        : [];
       const repliesContainer = document.querySelector(
         `.replies-container[data-parentcommentid="${replyToCommentId}"]`
       );
       const repliesTemplate = $.templates("#repliesTemplate");
 
       if (repliesContainer) {
-        repliesContainer.innerHTML = repliesForComment
+        repliesContainer.innerHTML = safeReplies
           .map((reply) => repliesTemplate.render(reply))
           .join("");
       }
-      UI.updateReplyCount(replyToCommentId, repliesForComment.length);
+      // Re-attach Tribute/@mention for newly rendered reply editor(s) (next frame)
+      try {
+        requestAnimationFrame(() => reInitMentionEditors(repliesContainer));
+      } catch (_) {
+        try {
+          setTimeout(() => reInitMentionEditors(repliesContainer), 0);
+        } catch (_) {}
+      }
+      UI.updateReplyCount(replyToCommentId, safeReplies.length);
     },
     updateReplyCount(replyToCommentId, count) {
       const replyCountElement = document.querySelector(
@@ -527,12 +653,14 @@
     },
   };
 
-  
-
   const handleComments = {
     async createComment() {
       const tempId = Date.now();
-      const commentContentEl = document.querySelector(".mentionable");
+      // Target the main comment editor explicitly (avoid picking a reply editor)
+      const commentContentEl =
+        document.getElementById("tributeEditor") ||
+        document.querySelector("#submissionComment .mentionable") ||
+        document.querySelector(".mentionable");
       const textContent = commentContentEl.innerText.trim();
 
       // Validate non-empty input using innerText
@@ -555,10 +683,18 @@
         Author_Last_Name: lastName,
         Author_Display_Name: displayName,
         Author_Profile_Image: authorProfileImage,
+        Author_ID: Number(authorID) || authorID,
         Date_Added: "Just Now",
+        Reply_to_Comment_ID: null,
       };
       comments = [newComment, ...comments];
       UI.updateComments(comments);
+      // Re-attach Tribute/@mention editors for any reply forms after re-render
+      try {
+        reInitMentionEditors(commentsContainer);
+        setTimeout(() => reInitMentionEditors(commentsContainer), 50);
+        setTimeout(() => reInitMentionEditors(commentsContainer), 200);
+      } catch (_) {}
       try {
         if (file) {
           const fileFields = [{ fieldName: "attachment", file: file }];
@@ -577,11 +713,12 @@
           }
         }
 
+        const mentionsFromDom = gatherMentionsFromElement(commentContentEl);
         const result = await SubmissionService.createComment(
           authorID,
           submissionID,
           commentContentEl.innerHTML, // send HTML payload
-          mentionArrays,
+          mentionsFromDom,
           fileData,
           commentFileName
         );
@@ -593,22 +730,32 @@
             Author_Last_Name: lastName,
             Author_Display_Name: displayName,
             Author_Profile_Image: authorProfileImage,
+            Author_ID: Number(authorID) || authorID,
             Date_Added: "Just Now",
+            Reply_to_Comment_ID:
+              result.createForumComment.reply_to_comment_id || null,
           };
 
-          if (fileData) {
-            try {
-              serverComment.File =
-                typeof fileData === "string" ? JSON.parse(fileData) : fileData;
-            } catch (e) {
-              serverComment.File = fileData;
-            }
+          const normalizedFile =
+            normalizeForumFile(
+              result.createForumComment.file,
+              result.createForumComment.comment_file_name || commentFileName
+            ) || normalizeForumFile(fileData, commentFileName);
+          if (normalizedFile) {
+            serverComment.File = normalizedFile;
+            serverComment.Comment_File_Name = normalizedFile.name;
           }
 
           comments = comments.map((comment) =>
             comment.tempId === newComment.tempId ? serverComment : comment
           );
           UI.updateComments(comments);
+          // Re-attach again after server-synced render
+          try {
+            reInitMentionEditors(commentsContainer);
+            setTimeout(() => reInitMentionEditors(commentsContainer), 50);
+            setTimeout(() => reInitMentionEditors(commentsContainer), 200);
+          } catch (_) {}
 
           // Create alerts for submission comment on newFileSubmission page
           (async () => {
@@ -745,8 +892,12 @@
                   ).filter(Boolean);
                 }
               } catch (_) {}
-              if (!mentionUIDs.length && Array.isArray(mentionArrays)) {
-                mentionUIDs = mentionArrays.map(String).filter(Boolean);
+              if (!mentionUIDs.length) {
+                try {
+                  mentionUIDs = gatherMentionsFromElement(commentContentEl)
+                    .map(String)
+                    .filter(Boolean);
+                } catch (_) {}
               }
               let mentionContactIds = [];
               if (mentionUIDs.length) {
@@ -926,13 +1077,24 @@
                     const qOwner = `query getSubmissionOwner($id: AwcSubmissionID) { getSubmission(query: [{ where: { id: $id } }]) { Student { Student { id } } } }`;
                     const rsOwner = await fetch(endpoint, {
                       method: "POST",
-                      headers: { "Content-Type": "application/json", "Api-Key": apiKey },
-                      body: JSON.stringify({ query: qOwner, variables: { id: Number(submissionID) } }),
+                      headers: {
+                        "Content-Type": "application/json",
+                        "Api-Key": apiKey,
+                      },
+                      body: JSON.stringify({
+                        query: qOwner,
+                        variables: { id: Number(submissionID) },
+                      }),
                     }).then((r) => (r.ok ? r.json() : null));
-                    submissionOwnerId = Number(rsOwner?.data?.getSubmission?.Student?.Student?.id || 0) || undefined;
+                    submissionOwnerId =
+                      Number(
+                        rsOwner?.data?.getSubmission?.Student?.Student?.id || 0
+                      ) || undefined;
                   } catch (_) {}
                   const actorName =
-                    displayName || `${firstName || ""} ${lastName || ""}`.trim() || "Someone";
+                    displayName ||
+                    `${firstName || ""} ${lastName || ""}`.trim() ||
+                    "Someone";
                   if (isMentioned) {
                     title = `You have been mentioned in the comment`;
                   } else if (
@@ -1053,7 +1215,7 @@
         if (filePreview) filePreview.classList.add("hidden");
         // Clear the contenteditable div manually instead of form.reset()
         commentContentEl.innerHTML = "";
-        mentionArrays = [];
+
         // Also clear the file input if needed
         if (fileInput) fileInput.value = "";
         // Reset attachment UI controls back to initial state
@@ -1091,7 +1253,7 @@
         await SubmissionService.deleteComment(commentId);
         commentElement.remove();
         comments = comments.filter(
-          (comment) => comment.commentID !== commentId
+          (comment) => String(comment.ID) !== String(commentId)
         );
       } catch (error) {
         const commentElement = document.querySelector(
@@ -1115,14 +1277,16 @@
         Author_Last_Name: lastName,
         Author_Display_Name: displayName,
         Author_Profile_Image: authorProfileImage,
+        Author_ID: Number(authorID) || authorID,
         Date_Added: "Just Now",
         Reply_to_Comment_ID: replyToCommentId,
       };
-      if (!replies[replyToCommentId]) {
-        replies[replyToCommentId] = [];
+      const replyKey = String(replyToCommentId);
+      if (!replies[replyKey]) {
+        replies[replyKey] = [];
       }
-      replies[replyToCommentId].push(newReply);
-      UI.updateReplies(replyToCommentId, replies[replyToCommentId]);
+      replies[replyKey].push(newReply);
+      UI.updateReplies(replyToCommentId, replies[replyKey]);
 
       try {
         const result = await CommentsService.createCommentOnReply(
@@ -1138,13 +1302,14 @@
             Author_Last_Name: lastName,
             Author_Display_Name: displayName,
             Author_Profile_Image: authorProfileImage,
+            Author_ID: Number(authorID) || authorID,
             Reply_to_Comment_ID: result.createForumComment.reply_to_comment_id,
             Date_Added: "Just Now",
           };
-          replies[replyToCommentId] = replies[replyToCommentId].map((reply) =>
+          replies[replyKey] = replies[replyKey].map((reply) =>
             reply.tempId === newReply.tempId ? serverReply : reply
           );
-          UI.updateReplies(replyToCommentId, replies[replyToCommentId]);
+          UI.updateReplies(replyToCommentId, replies[replyKey]);
           // Create alerts for submission reply on newFileSubmission page
           (async () => {
             try {
@@ -1453,30 +1618,49 @@
                   // Personalize replies: notify parent comment's author
                   let parentCommentAuthorId;
                   try {
-                    const parentLocal = (Array.isArray(comments) ? comments : []).find(
-                      (c) => Number(c?.ID) === Number(created?.reply_to_comment_id)
+                    const parentLocal = (
+                      Array.isArray(comments) ? comments : []
+                    ).find(
+                      (c) =>
+                        Number(c?.ID) === Number(created?.reply_to_comment_id)
                     );
                     if (parentLocal && parentLocal.Author_ID != null) {
                       parentCommentAuthorId = Number(parentLocal.Author_ID);
                     }
                   } catch (_) {}
-                  if (!parentCommentAuthorId && Number(created?.reply_to_comment_id || 0) > 0) {
+                  if (
+                    !parentCommentAuthorId &&
+                    Number(created?.reply_to_comment_id || 0) > 0
+                  ) {
                     try {
                       const qParent = `query parentAuthor($id: AwcForumCommentID) { calcForumComments(query: [{ where: { id: $id } }]) { Author_ID: field(arg: [\"author_id\"]) } }`;
                       const rsParent = await fetch(endpoint, {
                         method: "POST",
-                        headers: { "Content-Type": "application/json", "Api-Key": apiKey },
-                        body: JSON.stringify({ query: qParent, variables: { id: Number(created.reply_to_comment_id) } }),
+                        headers: {
+                          "Content-Type": "application/json",
+                          "Api-Key": apiKey,
+                        },
+                        body: JSON.stringify({
+                          query: qParent,
+                          variables: {
+                            id: Number(created.reply_to_comment_id),
+                          },
+                        }),
                       }).then((r) => (r.ok ? r.json() : null));
-                      const row = Array.isArray(rsParent?.data?.calcForumComments)
+                      const row = Array.isArray(
+                        rsParent?.data?.calcForumComments
+                      )
                         ? rsParent.data.calcForumComments[0]
                         : null;
                       const aid = Number(row?.Author_ID || 0);
-                      if (Number.isFinite(aid) && aid > 0) parentCommentAuthorId = aid;
+                      if (Number.isFinite(aid) && aid > 0)
+                        parentCommentAuthorId = aid;
                     } catch (_) {}
                   }
                   const actorName =
-                    displayName || `${firstName || ""} ${lastName || ""}`.trim() || "Someone";
+                    displayName ||
+                    `${firstName || ""} ${lastName || ""}`.trim() ||
+                    "Someone";
                   if (isMentioned) {
                     title = `You have been mentioned in the reply`;
                   } else if (
@@ -1571,10 +1755,10 @@
           })();
         }
       } catch (error) {
-        replies[replyToCommentId] = replies[replyToCommentId].filter(
+        replies[replyKey] = replies[replyKey].filter(
           (reply) => reply.tempId !== newReply.tempId
         );
-        UI.updateReplies(replyToCommentId, replies[replyToCommentId]);
+        UI.updateReplies(replyToCommentId, replies[replyKey]);
       }
     },
 
@@ -1595,11 +1779,14 @@
         // Remove the reply element from the DOM
         replyElement.remove();
         // Also update the replies array for the parent comment
-        if (parentCommentId && replies[parentCommentId]) {
-          replies[parentCommentId] = replies[parentCommentId].filter(
-            (reply) => reply.ID != replyId
-          );
-          UI.updateReplies(parentCommentId, replies[parentCommentId]);
+        if (parentCommentId) {
+          const parentKey = String(parentCommentId);
+          if (replies[parentKey]) {
+            replies[parentKey] = replies[parentKey].filter(
+              (reply) => reply.ID != replyId
+            );
+          }
+          UI.updateReplies(parentCommentId, replies[parentKey] || []);
         }
       } catch (error) {
         const replyElement = document.querySelector(
@@ -1633,8 +1820,8 @@
       const replyContentText = replyContentField.innerText.trim();
 
       if (replyContentText) {
-        const replyMentions = mentionArrays.slice();
-        mentionArrays = [];
+        const replyMentions = gatherMentionsFromElement(replyContentField);
+
         handleComments.createReply(
           replyToCommentId,
           replyContentHTML,
@@ -1642,6 +1829,10 @@
         );
         // Clear the contenteditable field appropriately
         replyContentField.innerHTML = "";
+        // Ensure the cleared editor keeps Tribute + placeholder
+        try {
+          initMentionableEditor(replyContentField);
+        } catch (_) {}
       }
     }
   });
@@ -1685,120 +1876,68 @@
       const defaultImageUrl =
         "https://files.ontraport.com/media/b0456fe87439430680b173369cc54cea.php03bzcx?Expires=4895186056&Signature=fw-mkSjms67rj5eIsiDF9QfHb4EAe29jfz~yn3XT0--8jLdK4OGkxWBZR9YHSh26ZAp5EHj~6g5CUUncgjztHHKU9c9ymvZYfSbPO9JGht~ZJnr2Gwmp6vsvIpYvE1pEywTeoigeyClFm1dHrS7VakQk9uYac4Sw0suU4MpRGYQPFB6w3HUw-eO5TvaOLabtuSlgdyGRie6Ve0R7kzU76uXDvlhhWGMZ7alNCTdS7txSgUOT8oL9pJP832UsasK4~M~Na0ku1oY-8a7GcvvVv6j7yE0V0COB9OP0FbC8z7eSdZ8r7avFK~f9Wl0SEfS6MkPQR2YwWjr55bbJJhZnZA__&Key-Pair-Id=APKAJVAAMVW6XQYWSTNA";
 
-      //const fetchedStudents = await SubmissionService.fetchStudents(classId);
-      //const formattedContacts = fetchedStudents
-      //  .map(c => ({
-      //    key: c.Student_Display_Name
-      //      ? c.Student_Display_Name
-      //    : ((c.Student_First_Name || "") + " " + (c.Student_Last_Name || "")).trim(),
-      //value: c.Student_Unique_ID,
-      //image: !c.Student_Profile_Image || c.Student_Profile_Image === "https://i.ontraport.com/abc.jpg"
-      //  ? defaultImageUrl
-      //: c.Student_Profile_Image
-      //}))
-      //.filter(c => c.key && c.value);
-
-      //globalTribute = new Tribute({
-      //  values: formattedContacts,
-      // menuItemTemplate: function (item) {
-      //   if (!item || !item.original) return "";
-      // return `<div class="cursor-pointer inline-flex items-center gap-x-1"><img src="${item.original.image}" style="object-fit:cover;height:20px;width:20px;border-radius:50%"><span>${item.original.key}</span></div>`;
-      //},
-      // selectTemplate: function (item) {
-      // if (!item || !item.original) return "";
-      //mentionArrays.push(item.original.value);
-      //return `<span class="mention-handle label bg-[#ebf6f6] text-[#007c8a] py-[1px] px-[2px] rounded" data-contact-id="${item.original.value}">@${item.original.key}</span>`;
-      //}
-      //});
-
-      const formattedContacts = await SubmissionService.fetchMentionsData(
-        classId
-      );
-      globalTribute = new Tribute({
-        values: formattedContacts,
-        menuItemTemplate: function (item) {
-          if (!item || !item.original) return "";
-          return `<div class="cursor-pointer inline-flex items-center gap-x-1">
-<img src="${item.original.image}" style="object-fit:cover;height:20px;width:20px;border-radius:50%">
-<span>${item.original.key}</span>
-  </div>`;
-        },
-        selectTemplate: function (item) {
-          if (!item || !item.original) return "";
-          mentionArrays.push(item.original.value);
-          return `<span 
-class="mention-handle label …" 
-data-mention-id="${item.original.value}"
->@${item.original.key}</span>`;
-        },
-      });
-
       const fetchedComments = await SubmissionService.fetchComments(
         submissionID
       );
       comments = fetchedComments || [];
+      replies = {};
       UI.updateComments(comments);
-
-      document.querySelectorAll(".mentionable").forEach((el) => {
-        globalTribute.attach(el);
-      });
-      const styledEditors = document.querySelectorAll(".mentionable");
-      styledEditors.forEach((singleEditor) => {
-        function setPlaceholder() {
-          if (!singleEditor.textContent.trim()) {
-            singleEditor.innerHTML =
-              '<span class="placeholder extra-small-text text-light text-[#586a80] text-base font-normal leading-normal"><i>Type @ to mention someone...</i></span>';
-          }
-        }
-
-        singleEditor.addEventListener("focus", () => {
-          if (singleEditor.querySelector(".placeholder")) {
-            singleEditor.innerHTML = "";
-          }
-        });
-
-        singleEditor.addEventListener("blur", setPlaceholder);
-
-        // Initialize placeholder.
-        setPlaceholder();
-      });
+      // Mentions are handled by external NewMentionManager (if present on page).
+      if (
+        window.NewMentionManager &&
+        typeof window.NewMentionManager.initContacts === "function"
+      ) {
+        try {
+          window.NewMentionManager.initContacts();
+        } catch (_) {}
+      }
+      // Initialize/reattach Tribute on all current editors
+      try {
+        reInitMentionEditors(document);
+      } catch (_) {}
 
       for (const comment of comments) {
-        const fetchedReplies = await CommentsService.fetchReplies(comment.ID);
-        if (fetchedReplies) {
-          replies[comment.ID] = [
-            ...(replies[comment.ID] || []),
-            ...fetchedReplies,
-          ];
-          UI.updateReplies(comment.ID, replies[comment.ID]);
+        const commentIdKey = String(comment.ID);
+        let repliesForComment = [];
+        try {
+          const fetchedReplies = await CommentsService.fetchReplies(comment.ID);
+          repliesForComment = Array.isArray(fetchedReplies)
+            ? fetchedReplies
+            : [];
+        } catch (err) {
+          repliesForComment = replies[commentIdKey] || [];
+        }
+        replies[commentIdKey] = repliesForComment;
+        UI.updateReplies(comment.ID, repliesForComment);
 
-          // NEW: Update vote counts for each reply
-          for (const reply of replies[comment.ID]) {
-            const replyVoters =
-              (await handleVotesForComments.fetchVotersForComments(reply.ID)) ||
-              [];
-            const isReplyVoted = replyVoters.some(
-              (voter) => voter.voterID === parseInt(authorID)
-            );
-            const replyVoteCount = replyVoters.length;
-            const replyVoteButton = document.querySelector(
-              `[data-commentvoteid="${reply.ID}"]`
-            );
-            const replyVoteCountElement = document.querySelector(
-              `[data-commentvotecountelement="${reply.ID}"]`
-            );
-            if (replyVoteButton) {
-              if (isReplyVoted) {
-                replyVoteButton.classList.add("voted");
-              } else {
-                replyVoteButton.classList.remove("voted");
-              }
-            }
-            if (replyVoteCountElement) {
-              replyVoteCountElement.textContent = replyVoteCount;
+        for (const reply of repliesForComment) {
+          const replyVoters =
+            (await handleVotesForComments.fetchVotersForComments(reply.ID)) ||
+            [];
+          const isReplyVoted = replyVoters.some(
+            (voter) => voter.voterID === parseInt(authorID)
+          );
+          const replyVoteCount = replyVoters.length;
+          const replyVoteButton = document.querySelector(
+            `[data-commentvoteid="${reply.ID}"]`
+          );
+          const replyVoteCountElement = document.querySelector(
+            `[data-commentvotecountelement="${reply.ID}"]`
+          );
+          if (replyVoteButton) {
+            if (isReplyVoted) {
+              replyVoteButton.classList.add("voted");
+            } else {
+              replyVoteButton.classList.remove("voted");
             }
           }
+          if (replyVoteCountElement) {
+            replyVoteCountElement.textContent = replyVoteCount;
+          }
         }
+      }
+
+      for (const comment of comments) {
         const voters =
           (await handleVotesForComments.fetchVotersForComments(comment.ID)) ||
           [];
@@ -1838,13 +1977,77 @@ data-mention-id="${item.original.value}"
     }
   });
 
-  document.addEventListener("focusin", (e) => {
-    const m = e.target.closest(".mentionable");
-    if (m && !m.dataset.tributeAttached && globalTribute) {
-      globalTribute.attach(m);
-      m.dataset.tributeAttached = "true";
+  // Observe DOM changes under commentsContainer to auto-init new editors
+  try {
+    const observer = new MutationObserver((mutations) => {
+      for (const m of mutations) {
+        m.addedNodes.forEach((node) => {
+          if (node && node.nodeType === 1) {
+            if (node.classList && node.classList.contains("mentionable")) {
+              try {
+                initMentionableEditor(node);
+              } catch (_) {}
+            }
+            node.querySelectorAll?.(".mentionable")?.forEach((inner) => {
+              try {
+                initMentionableEditor(inner);
+              } catch (_) {}
+            });
+          }
+        });
+      }
+    });
+    if (commentsContainer) {
+      observer.observe(commentsContainer, { childList: true, subtree: true });
+    }
+  } catch (_) {}
+
+  // Safety net: lazily init Tribute on focus if needed
+  try {
+    document.addEventListener("focusin", (e) => {
+      const el = e.target;
+      if (el && el.classList && el.classList.contains("mentionable")) {
+        if (!el.hasAttribute("data-tribute-attached")) {
+          try {
+            initMentionableEditor(el);
+          } catch (_) {}
+        }
+      }
+    });
+    document.addEventListener(
+      "keydown",
+      (e) => {
+        const el = e.target;
+        if (!el || !el.classList || !el.classList.contains("mentionable"))
+          return;
+        if (el.hasAttribute("data-tribute-attached")) return;
+        if (e.key === "@") {
+          try {
+            initMentionableEditor(el);
+          } catch (_) {}
+        }
+      },
+      true
+    );
+  } catch (_) {}
+
+  // If user toggles a reply form open, ensure its editor is initialized
+  commentsContainer.addEventListener("click", (e) => {
+    const toggle = e.target.closest("[data-replyformtoggle]");
+    if (!toggle) return;
+    const commentId = toggle.getAttribute("data-replyformtoggle");
+    const replyForm = document.querySelector(`[data-replyform="${commentId}"]`);
+    if (replyForm) {
+      // Defer slightly to allow any CSS class toggles/DOM changes
+      setTimeout(() => {
+        try {
+          reInitMentionEditors(replyForm);
+        } catch (_) {}
+      }, 0);
     }
   });
+
+  // Mentions editor is injected by NewMentionManager; no local focus handlers needed.
 
   document.addEventListener("DOMContentLoaded", () => {
     const fileInput = document.getElementById("attachment-file-input");
@@ -1890,7 +2093,8 @@ data-mention-id="${item.original.value}"
       const attachBtn = document.querySelector(".attachBtn");
       const refreshBtn = document.querySelector(".refreshBtn");
       const deleteBtn = document.querySelector(".deleteBtn");
-      const previewEl = document.querySelector(".filePreviewWrapper") || filePreview;
+      const previewEl =
+        document.querySelector(".filePreviewWrapper") || filePreview;
       if (fileInput) fileInput.value = "";
       if (previewEl) {
         previewEl.textContent = "";
@@ -1901,4 +2105,295 @@ data-mention-id="${item.original.value}"
       if (attachBtn) attachBtn.classList.remove("hidden");
     } catch (_) {}
   }
+</script>
+
+<script>
+  let isAdminVisitor = "[Visitor//Is Admin]";
+  let isTeacherVisitor = "[Visitor//Is Instructor?]";
+  console.log("isAdminVisitor", isAdminVisitor);
+  console.log("isTeacherVisitor", isTeacherVisitor);
+
+  // ========= NewMentionManager (clean, cached, self-initializing) =========
+  class NewMentionManager {
+    static allContacts = [];
+    static _contactsPromise = null;
+    static _contactsLoaded = false;
+
+    // 1) Load contacts ONCE (cached)
+    static initContacts() {
+      if (NewMentionManager._contactsLoaded) {
+        return NewMentionManager._contactsPromise || Promise.resolve();
+      }
+      if (NewMentionManager._contactsPromise) {
+        return NewMentionManager._contactsPromise;
+      }
+
+      NewMentionManager._contactsPromise = (async () => {
+        try {
+          const norm = (v) =>
+            String(v ?? "")
+              .trim()
+              .toLowerCase();
+          const isPrivate = norm(isAssessmentPrivateToCheckMentions) === "yes";
+          const isAdmin = norm(isAdminVisitor) === "yes";
+          const isInstructor = norm(isTeacherVisitor) === "yes";
+          const isStudent = !isAdmin && !isInstructor;
+
+          // Who is allowed to see (and thus fetch) students?
+          // - If private: only admins/instructors see students
+          // - If not private: everyone sees students
+          const includeStudents = isAdmin || isInstructor || !isPrivate;
+
+          const classQueryFields = `
+            Teacher { first_name last_name display_name profile_image unique_id id }
+            ${
+              includeStudents
+                ? `
+            Enrolments { Student { first_name last_name display_name profile_image unique_id id } }`
+                : ""
+            }
+          `;
+
+          const getClassQuery = `
+            query {
+              getClasses(query: [{ where: { id: ${currentClassID} } }]) { ${classQueryFields} }
+            }
+          `;
+
+          const getAdminQuery = `
+            query {
+              getContact(query: [{ where: { email: "courses@writerscentre.com.au" } }]) {
+                Display_Name: display_name
+                Contact_ID: id
+                Unique_ID: unique_id
+                Profile_Image: profile_image
+                Is_Instructor: is_instructor
+                Is_Admin: is_admin
+                Email: email
+              }
+            }
+          `;
+
+          const [classData, adminData] = await Promise.all([
+            fetch(useGloballyAPIEndPointURLGraphQL, {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                "Api-Key": useGloballyAPIKeyGraphQL,
+              },
+              body: JSON.stringify({ query: getClassQuery }),
+            }).then((res) =>
+              res.ok ? res.json() : Promise.reject("getClasses query failed")
+            ),
+            fetch(useGloballyAPIEndPointURLGraphQL, {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                "Api-Key": useGloballyAPIKeyGraphQL,
+              },
+              body: JSON.stringify({ query: getAdminQuery }),
+            }).then((res) =>
+              res.ok ? res.json() : Promise.reject("getContact query failed")
+            ),
+          ]);
+
+          const contacts = [];
+          const result = classData?.data?.getClasses?.[0];
+
+          if (result?.Teacher?.display_name?.trim()) {
+            contacts.push({
+              key: result.Teacher.display_name,
+              value: result.Teacher.display_name,
+              name: result.Teacher.display_name,
+              id: result.Teacher.id,
+              uniqueId: result.Teacher.unique_id,
+              profileImage: result.Teacher.profile_image,
+              isAdmin: false,
+              isInstructor: true,
+            });
+          }
+
+          // Only push students if the visitor is admin or instructor
+          if (includeStudents) {
+            (result?.Enrolments || []).forEach(({ Student }) => {
+              if (Student?.display_name?.trim()) {
+                contacts.push({
+                  key: Student.display_name,
+                  value: Student.display_name,
+                  name: Student.display_name,
+                  id: Student.id,
+                  uniqueId: Student.unique_id,
+                  profileImage: Student.profile_image,
+                  isAdmin: false,
+                  isInstructor: false,
+                });
+              }
+            });
+          }
+
+          const admin = adminData?.data?.getContact;
+          if (admin?.Display_Name?.trim()) {
+            contacts.push({
+              key: admin.Display_Name,
+              value: admin.Display_Name,
+              name: admin.Display_Name,
+              id: admin.Contact_ID,
+              uniqueId: admin.Unique_ID,
+              profileImage: admin.Profile_Image,
+              isAdmin: true,
+              isInstructor: admin.Is_Instructor,
+            });
+          }
+
+          NewMentionManager.allContacts = contacts;
+          NewMentionManager._contactsLoaded = true;
+        } catch (e) {
+          console.error("NewMentionManager.initContacts failed", e);
+        }
+      })();
+
+      return NewMentionManager._contactsPromise;
+    }
+
+    // 2) Tribute values provider — waits for contacts if needed (prevents empty menus)
+    static fetchMentionContacts(text, cb) {
+      const run = () => {
+        const searchText = (text || "").toLowerCase();
+        const filtered = NewMentionManager.allContacts.filter((c) =>
+          (c.value || "").toLowerCase().includes(searchText)
+        );
+        cb(filtered);
+      };
+
+      if (NewMentionManager._contactsLoaded) return run();
+
+      NewMentionManager.initContacts()
+        .then(() => run())
+        .catch(() => run()); // fallback: use whatever we have
+    }
+
+    // 3) Attach Tribute to a single editor (idempotent via data-tribute-attached)
+    static initEditor(editor) {
+      if (!editor || editor.nodeType !== 1) return;
+      if (editor.hasAttribute("data-tribute-attached")) return;
+
+      try {
+        const tribute = new Tribute({
+          trigger: "@",
+          allowSpaces: true,
+          lookup: "name",
+          values:
+            NewMentionManager.fetchMentionContacts.bind(NewMentionManager),
+          menuItemTemplate: NewMentionManager.mentionTemplate,
+          selectTemplate: NewMentionManager.selectTemplate,
+          menuContainer: document.body,
+        });
+        tribute.attach(editor);
+        editor.setAttribute("data-tribute-attached", "true");
+
+        // Lightweight placeholder UX (optional, matches your previous behavior)
+        NewMentionManager._initPlaceholder(editor);
+      } catch (e) {
+        console.error("initEditor failed", e);
+      }
+    }
+
+    // 4) Initialize all current editors within a root
+    static ensureEditors(root = document) {
+      try {
+        const editors = root.querySelectorAll?.(".mentionable");
+        editors?.forEach((ed) => NewMentionManager.initEditor(ed));
+      } catch (e) {
+        console.error("ensureEditors failed", e);
+      }
+    }
+
+    // 5) Auto-init future editors via MutationObserver
+    static observe(root = document) {
+      try {
+        const observer = new MutationObserver((mutations) => {
+          mutations.forEach((m) => {
+            m.addedNodes.forEach((node) => {
+              if (node?.nodeType !== 1) return;
+              if (node.matches?.(".mentionable")) {
+                NewMentionManager.initEditor(node);
+              }
+              node
+                .querySelectorAll?.(".mentionable")
+                ?.forEach((ed) => NewMentionManager.initEditor(ed));
+            });
+          });
+        });
+        observer.observe(root, { childList: true, subtree: true });
+      } catch (e) {
+        console.error("observe failed", e);
+      }
+    }
+
+    // --- Templates kept from your version ---
+    static mentionTemplate(item) {
+      const fallback =
+        "https://files.ontraport.com/media/b0456fe87439430680b173369cc54cea.php03bzcx?Expires=4895186056&Signature=fw-mkSjms67rj5eIsiDF9QfHb4EAe29jfz~yn3XT0--8jLdK4OGkxWBZR9YHSh26ZAp5EHj~6g5CUUncgjztHHKU9c9ymvZYfSbPO9JGht~ZJnr2Gwmp6vsvIpYvE1pEywTeoigeyClFm1dHrS7VakQk9uYac4Sw0suU4MpRGYQPFB6w3HUw-eO5TvaOLabtuSlgdyGRie6Ve0R7kzU76uXDvlhhWGMZ7alNCTdS7txSgUOT8oL9pJP832UsasK4~M~Na0ku1oY-8a7GcvvVv6j7yE0V0COB9OP0FbC8z7eSdZ8r7avFK~f9Wl0SEfS6MkPQR2YwWjr55bbJJhZnZA__&Key-Pair-Id=APKAJVAAMVW6XQYWSTNA";
+      const src =
+        item.original.profileImage &&
+        item.original.profileImage !== "https://i.ontraport.com/abc.jpg"
+          ? item.original.profileImage
+          : fallback;
+
+      const role = item.original.isAdmin
+        ? " (Admin)"
+        : item.original.isInstructor
+        ? " (Teacher)"
+        : "";
+
+      return `
+        <div class="flex items-center gap-3 px-3 py-2">
+          <img class="w-6 h-6 rounded-full border border-[#d3d3d3]" src="${src}" alt="${item.original.name}'s Profile Image" />
+          <div class="text-primary">${item.original.name}${role}</div>
+        </div>`;
+    }
+
+    static selectTemplate(item) {
+      return `<span class="mention" data-mention-id="${item.original.uniqueId}" data-contact-id="${item.original.id}">@${item.original.value}</span>`;
+    }
+
+    // --- Small helper: placeholder behavior for empty editors ---
+    static _initPlaceholder(editor) {
+      if (editor.hasAttribute("data-placeholder-initialized")) return;
+
+      const setPlaceholder = () => {
+        if (
+          !editor.textContent.trim() &&
+          !editor.querySelector(".mention-placeholder")
+        ) {
+          const span = document.createElement("span");
+          span.className =
+            "mention-placeholder text-[#586a80] text-base font-normal leading-normal pointer-events-none select-none";
+          span.innerHTML = "Type @ to mention members";
+          editor.appendChild(span);
+        }
+      };
+
+      editor.addEventListener("focus", () => {
+        const ph = editor.querySelector(".mention-placeholder");
+        if (ph) ph.remove();
+      });
+
+      editor.addEventListener("blur", () => {
+        setTimeout(setPlaceholder, 10);
+      });
+
+      setPlaceholder();
+      editor.setAttribute("data-placeholder-initialized", "true");
+    }
+  }
+
+  // ---- Single, simple bootstrapping (replaces your jQuery & setTimeout init) ----
+  document.addEventListener("DOMContentLoaded", () => {
+    try {
+      NewMentionManager.initContacts();
+    } catch (_) {}
+    NewMentionManager.ensureEditors(document);
+    NewMentionManager.observe(document);
+  });
 </script>

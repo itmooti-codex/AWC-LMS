@@ -284,17 +284,51 @@ var myHelpers = {
       }
     }
     if (typeof parsed === "string") {
-      if (parsed.trim() === "{}") return null;
-      return { link: parsed, name: parsed };
+      const normalized = parsed.trim();
+      if (!normalized) return null;
+      const lowered = normalized.toLowerCase();
+      if (
+        normalized === "{}" ||
+        normalized === "[]" ||
+        normalized === "\"\"" ||
+        normalized === "''" ||
+        lowered === "undefined" ||
+        lowered === "null"
+      )
+        return null;
+      return { link: normalized, name: normalized };
     }
     if (parsed && typeof parsed === "object") {
       if (Object.keys(parsed).length === 0) return null;
       if (!parsed.link && parsed.s3_id)
         parsed.link =
           "https://t.writerscentre.com.au/s/dl?token=" + parsed.s3_id;
-      if (parsed.link || parsed.name) return parsed;
+      if (parsed.link || parsed.name) {
+        // Only return file object if we have both link and name
+        if (parsed.link && parsed.name) {
+          return {
+            link: parsed.link,
+            name: parsed.name,
+            type: parsed.type || ""
+          };
+        }
+        // If we don't have both essential properties, return null
+        return null;
+      }
     }
-    return { link: trimmed, name: trimmed };
+    const fallback = trimmed.trim();
+    if (!fallback) return null;
+    const fallbackLower = fallback.toLowerCase();
+    if (
+      fallback === "{}" ||
+      fallback === "[]" ||
+      fallback === "\"\"" ||
+      fallback === "''" ||
+      fallbackLower === "undefined" ||
+      fallbackLower === "null"
+    )
+      return null;
+    return { link: fallback, name: fallback };
   },
   getFileCategory: function (fileObj) {
     let mime = fileObj.type || "";
@@ -303,7 +337,9 @@ var myHelpers = {
       if (mime.startsWith("audio/")) return "audio";
       if (mime.startsWith("video/")) return "video";
     }
-    const lowerName = fileObj.name.toLowerCase();
+    const lowerName = (
+      (fileObj && (fileObj.name || fileObj.link)) || ""
+    ).toLowerCase();
     if (/\.(jpg|jpeg|png|gif|bmp|webp)$/.test(lowerName)) return "image";
     if (/\.(mp3|wav|ogg)$/.test(lowerName)) return "audio";
     if (/\.(mp4|webm|ogg)$/.test(lowerName)) return "video";
@@ -313,8 +349,12 @@ var myHelpers = {
     const fileObj = myHelpers.getFileInfo(fileString);
     if (!fileObj) return "";
     const category = myHelpers.getFileCategory(fileObj);
-    const link = fileObj.link;
-    const name = fileObj.name;
+    const link = fileObj.link || "";
+    const name = fileObj.name || "";
+    
+    // Don't render anything if essential file data is missing
+    if (!link || !name) return "";
+    
     if (category === "image")
       return (
         "<div class='mt-2 mb-4 w-full'><img src='" +
@@ -2248,14 +2288,22 @@ $(document).on("click", ".deleteFileContainerComment", function () {
 });
 
 // Helper to reset the file upload UI for a comment form
-function resetCommentFileUploadUI(form) {
-  var container = $(form).find(".commentForm");
-  container.find(".formFileInputForComment").val("");
-  container
+function resetCommentFileUploadUI(formOrContainer) {
+  let $root = $(formOrContainer);
+  let $container = $root.hasClass("commentForm")
+    ? $root
+    : $root.closest(".commentForm");
+  if (!$container || !$container.length) {
+    $container = $root.find(".commentForm").first();
+  }
+  if (!$container || !$container.length) return;
+
+  $container.find(".formFileInputForComment").val("");
+  $container
     .find(".replaceFileContainerComment, .deleteFileContainerComment")
     .hide();
-  container.find(".attachAFileForComment").show();
-  container.find(".commentFilePreviewContainer").html("");
+  $container.find(".attachAFileForComment").show();
+  $container.find(".commentFilePreviewContainer").empty();
 }
 
 function getFilePreviewHTML(file) {

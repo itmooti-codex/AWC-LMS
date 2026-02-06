@@ -111,7 +111,7 @@
                   {{if post_copy !== undefined}} {{:post_copy}} {{else}} {{:comment}} {{/if}}
               </div>
   
-              {{if ~getFileInfo(file)}} {{:~renderFile(file)}} {{/if}}
+              {{if file && ~getFileInfo(file)}} {{:~renderFile(file)}} {{/if}}
   
               <!-- Voting and Comment Counts -->
               {{if post_copy !== undefined}}
