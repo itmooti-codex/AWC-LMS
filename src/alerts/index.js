@@ -252,66 +252,71 @@ const { slug, apiKey: configApiKey } = config;
         return true;
       };
 
-      const runBulk = async (useId) => {
-        if (!hasUid) return { ran: false, result: null };
-        const getTarget = () => {
-          const mut = typeof plugin.mutation === "function" ? plugin.mutation() : null;
-          if (mut) {
-            if (useId && typeof mut.switchToId === "function")
-              return mut.switchToId("ALERT");
-            if (typeof mut.switchTo === "function")
-              return mut.switchTo("AwcAlert");
-          }
+      const getMutationPair = (useId) => {
+        const pluginMut =
+          typeof plugin.mutation === "function" ? plugin.mutation() : null;
+        let modelMut = null;
+        if (pluginMut) {
+          if (useId && typeof pluginMut.switchToId === "function")
+            modelMut = pluginMut.switchToId("ALERT");
+          else if (typeof pluginMut.switchTo === "function")
+            modelMut = pluginMut.switchTo("AwcAlert");
+        }
+        if (!modelMut) {
           const model =
             useId && typeof plugin.switchToId === "function"
               ? plugin.switchToId("ALERT")
               : plugin.switchTo("AwcAlert");
           if (model && typeof model.mutation === "function") {
-            const m = model.mutation();
-            if (m && typeof m.update === "function") return m;
+            modelMut = model.mutation();
           }
-          return null;
-        };
-        const target = getTarget();
-        if (!target || typeof target.update !== "function" || typeof target.execute !== "function")
+        }
+        const execMut =
+          (pluginMut && typeof pluginMut.execute === "function"
+            ? pluginMut
+            : null) ||
+          (modelMut && typeof modelMut.execute === "function" ? modelMut : null) ||
+          (modelMut?.controller &&
+          typeof modelMut.controller.execute === "function"
+            ? modelMut.controller
+            : null);
+        return { modelMut, execMut };
+      };
+
+      const runBulk = async (useId) => {
+        if (!hasUid) return { ran: false, result: null };
+        const { modelMut, execMut } = getMutationPair(useId);
+        if (
+          !modelMut ||
+          typeof modelMut.update !== "function" ||
+          !execMut ||
+          typeof execMut.execute !== "function"
+        )
           return { ran: false, result: null };
-        target.update((q) =>
+        modelMut.update((q) =>
           q
             .where("notified_contact_id", uid)
             .where("is_read", false)
             .set({ is_read: true })
         );
-        const result = await target.execute(true).toPromise();
+        const result = await execMut.execute(true).toPromise();
         return { ran: true, result };
       };
 
       const runByIds = async (useId) => {
         if (!unreadIds.length) return { ran: false, result: null };
-        const getTarget = () => {
-          const mut = typeof plugin.mutation === "function" ? plugin.mutation() : null;
-          if (mut) {
-            if (useId && typeof mut.switchToId === "function")
-              return mut.switchToId("ALERT");
-            if (typeof mut.switchTo === "function")
-              return mut.switchTo("AwcAlert");
-          }
-          const model =
-            useId && typeof plugin.switchToId === "function"
-              ? plugin.switchToId("ALERT")
-              : plugin.switchTo("AwcAlert");
-          if (model && typeof model.mutation === "function") {
-            const m = model.mutation();
-            if (m && typeof m.update === "function") return m;
-          }
-          return null;
-        };
-        const target = getTarget();
-        if (!target || typeof target.update !== "function" || typeof target.execute !== "function")
+        const { modelMut, execMut } = getMutationPair(useId);
+        if (
+          !modelMut ||
+          typeof modelMut.update !== "function" ||
+          !execMut ||
+          typeof execMut.execute !== "function"
+        )
           return { ran: false, result: null };
         const chunkSize = 200;
         for (let i = 0; i < unreadIds.length; i += chunkSize) {
           const chunk = unreadIds.slice(i, i + chunkSize);
-          target.update((q) => {
+          modelMut.update((q) => {
             let qb = q;
             if (hasUid) qb = qb.where("notified_contact_id", uid);
             if (typeof qb.whereIn === "function") {
@@ -325,7 +330,7 @@ const { slug, apiKey: configApiKey } = config;
             return qb.set({ is_read: true });
           });
         }
-        const result = await target.execute(true).toPromise();
+        const result = await execMut.execute(true).toPromise();
         return { ran: true, result };
       };
 
@@ -360,7 +365,12 @@ const { slug, apiKey: configApiKey } = config;
       if (!success) {
         const gqlOk = await updateAlertsViaGraphql(unreadIds);
         if (!gqlOk) {
-          console.error("Mark all as read failed", lastErr);
+          const err =
+            lastErr ||
+            new Error(
+              "No valid SDK mutation target/execute found and GraphQL fallback failed."
+            );
+          console.error("Mark all as read failed", err);
           return;
         }
       }
