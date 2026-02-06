@@ -254,11 +254,26 @@ const { slug, apiKey: configApiKey } = config;
 
       const runBulk = async (useId) => {
         if (!hasUid) return { ran: false, result: null };
-        const mut = plugin.mutation();
-        const target =
-          useId && typeof mut.switchToId === "function"
-            ? mut.switchToId("ALERT")
-            : mut.switchTo("AwcAlert");
+        const getTarget = () => {
+          const mut = typeof plugin.mutation === "function" ? plugin.mutation() : null;
+          if (mut) {
+            if (useId && typeof mut.switchToId === "function")
+              return mut.switchToId("ALERT");
+            if (typeof mut.switchTo === "function")
+              return mut.switchTo("AwcAlert");
+          }
+          const model =
+            useId && typeof plugin.switchToId === "function"
+              ? plugin.switchToId("ALERT")
+              : plugin.switchTo("AwcAlert");
+          if (model && typeof model.mutation === "function") {
+            const m = model.mutation();
+            if (m && typeof m.update === "function") return m;
+          }
+          return null;
+        };
+        const target = getTarget();
+        if (!target) return { ran: false, result: null };
         const result = await target
           .update((q) =>
             q
@@ -273,11 +288,26 @@ const { slug, apiKey: configApiKey } = config;
 
       const runByIds = async (useId) => {
         if (!unreadIds.length) return { ran: false, result: null };
-        const mut = plugin.mutation();
-        const target =
-          useId && typeof mut.switchToId === "function"
-            ? mut.switchToId("ALERT")
-            : mut.switchTo("AwcAlert");
+        const getTarget = () => {
+          const mut = typeof plugin.mutation === "function" ? plugin.mutation() : null;
+          if (mut) {
+            if (useId && typeof mut.switchToId === "function")
+              return mut.switchToId("ALERT");
+            if (typeof mut.switchTo === "function")
+              return mut.switchTo("AwcAlert");
+          }
+          const model =
+            useId && typeof plugin.switchToId === "function"
+              ? plugin.switchToId("ALERT")
+              : plugin.switchTo("AwcAlert");
+          if (model && typeof model.mutation === "function") {
+            const m = model.mutation();
+            if (m && typeof m.update === "function") return m;
+          }
+          return null;
+        };
+        const target = getTarget();
+        if (!target) return { ran: false, result: null };
         const chunkSize = 200;
         for (let i = 0; i < unreadIds.length; i += chunkSize) {
           const chunk = unreadIds.slice(i, i + chunkSize);
