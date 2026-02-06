@@ -197,13 +197,12 @@ const { slug, apiKey: configApiKey } = config;
 
       // Use the same pattern as markAsRead for all unread alerts
       const run = async (useId) => {
-        const mut = plugin.mutation();
-        const target = useId
-          ? mut.switchToId("ALERT")
-          : mut.switchTo("AwcAlert");
-
         // Update all alerts with is_read = false
         for (const id of unreadIds) {
+          const mut = plugin.mutation();
+          const target = useId
+            ? mut.switchToId("ALERT")
+            : mut.switchTo("AwcAlert");
           await target
             .update((q) => q.where("id", Number(id)).set({ is_read: true }))
             .execute(true)
